@@ -14,9 +14,13 @@ from osfclient.tests.mocks import MockProject
 
 def test_anonymous_doesnt_work():
     args = MockArgs(project='1234')
+    def simple_getenv(key):
+        return None
 
     with pytest.raises(SystemExit) as e:
-        remove(args)
+        with patch('osfclient.cli.os.getenv',
+                   side_effect=simple_getenv) as mock_getenv:
+            remove(args)
 
     expected = 'remove a file you need to provide a username and password'
     assert expected in e.value.args[0]
