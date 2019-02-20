@@ -48,3 +48,20 @@ class OSF(OSFCore):
     def password(self):
         if self.session.auth is not None:
             return self.session.auth[1]
+
+    @property
+    def token(self):
+        if 'Authorization' not in self.session.headers:
+            return None
+        auth = self.session.headers['Authorization']
+        if not auth.startswith('Bearer '):
+            return None
+        return auth.split()[-1]
+
+    @property
+    def has_auth(self):
+        if self.username is not None and self.password is not None:
+            return True
+        if self.token is not None:
+            return True
+        return False

@@ -35,6 +35,17 @@ def test_login_by_token(session_token_auth):
     session_token_auth.assert_called_with('0123456789abcd')
 
 
+def test_has_auth():
+    osf = OSF()
+    assert not osf.has_auth
+
+    osf = OSF(username='joe@example.com', password='secret_password')
+    assert osf.has_auth
+
+    osf = OSF(token='0123456789abcd')
+    assert osf.has_auth
+
+
 @patch.object(OSFSession, 'set_endpoint')
 def test_endpoint(session_set_endpoint):
     osf = OSF()
