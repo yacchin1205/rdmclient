@@ -26,6 +26,24 @@ def test_login(session_basic_auth):
     session_basic_auth.assert_called_with('joe@example.com', 'secret_password')
 
 
+@patch.object(OSFSession, 'token_auth')
+def test_login_by_token(session_token_auth):
+    osf = OSF()
+    assert not session_token_auth.called
+
+    osf.login_by_token('0123456789abcd')
+    session_token_auth.assert_called_with('0123456789abcd')
+
+
+@patch.object(OSFSession, 'set_endpoint')
+def test_endpoint(session_set_endpoint):
+    osf = OSF()
+    assert not session_set_endpoint.called
+
+    osf = OSF(base_url='https://api.test.osf.io/v2/')
+    session_set_endpoint.assert_called_with('https://api.test.osf.io/v2/')
+
+
 @patch.object(OSFCore, '_get', return_value=FakeResponse(200, project_node))
 def test_get_project(OSFCore_get):
     osf = OSF()
@@ -67,3 +85,13 @@ def test_failed_get_project(OSFCore_get):
     OSFCore_get.assert_called_once_with(
         'https://api.osf.io/v2//guids/f3szh/'
         )
+
+
+@patch.object(OSFCore, '_get', return_value=FakeResponse(200, project_node))
+def test_get_project_with_endpoint(OSFCore_get):
+    osf = OSF(base_url='https://api.test.osf.io/v2/')
+    project = osf.project('f3szh')
+
+    calls = [call('https://api.test.osf.io/v2//guids/f3szh/'), call('https://api.test.osf.io/v2//nodes/f3szh/')]
+    OSFCore_get.assert_has_calls(calls)
+    assert isinstance(project, Project)
