@@ -37,6 +37,7 @@ class File(OSFCore):
                                                 'attributes', 'date_created')
         self.date_modified = self._get_attribute(file,
                                                  'attributes', 'date_modified')
+        self.size = self._get_attribute(file, 'attributes', 'size')
         self.hashes = self._get_attribute(file,
                                           'attributes', 'extra', 'hashes')
 
