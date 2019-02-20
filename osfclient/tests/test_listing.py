@@ -1,5 +1,6 @@
 """Test `osf ls` command"""
 
+from dateutil import tz
 from mock import call
 from mock import patch
 
@@ -117,7 +118,7 @@ def test_list(capsys):
 def test_long_format_list(capsys):
     args = MockArgs(project='f3szh', long_format=True)
 
-    dates = ['"2019-02-20T14:02:00.000000"', '"2019-02-19T17:01:00.000000"']
+    dates = ['"2019-02-20T14:02:00.000000Z"', '"2019-02-19T17:01:00.000000Z"']
     njson = fake_responses._build_node('nodes')
     fjson = fake_responses.files_node('f3szh', 'osfstorage',
                                       file_names=['hello.txt', 'bye.txt'],
@@ -138,9 +139,11 @@ def test_long_format_list(capsys):
             print(url)
             raise ValueError()
 
-    with patch.object(OSFCore, '_get',
-                      side_effect=simple_OSFCore_get) as mock_osf_get:
-        list_(args)
+    with patch('osfclient.cli.get_localzone',
+               return_value=tz.tzutc()) as mock_get_localzone:
+        with patch.object(OSFCore, '_get',
+                          side_effect=simple_OSFCore_get) as mock_osf_get:
+            list_(args)
     captured = capsys.readouterr()
     assert captured.err == ''
     expected = ['2019-02-19 17:01:00 3 osfstorage/bye.txt',
