@@ -10,14 +10,22 @@ class OSF(OSFCore):
     OSF. Use the methods of this class to find projects, login
     to the OSF, etc.
     """
-    def __init__(self, username=None, password=None, token=None):
+    def __init__(self, username=None, password=None, token=None, base_url=None):
         super(OSF, self).__init__({})
+        if base_url is not None:
+            self.session.set_endpoint(base_url)
         if username is not None and password is not None:
             self.login(username, password)
+        elif token is not None:
+            self.login_by_token(token)
 
-    def login(self, username, password=None, token=None):
+    def login(self, username, password=None):
         """Login user for protected API calls."""
         self.session.basic_auth(username, password)
+
+    def login_by_token(self, token):
+        """Login user for protected API calls using Access Token."""
+        self.session.token_auth(token)
 
     def project(self, project_id):
         """Fetch project `project_id`."""
@@ -40,3 +48,20 @@ class OSF(OSFCore):
     def password(self):
         if self.session.auth is not None:
             return self.session.auth[1]
+
+    @property
+    def token(self):
+        if 'Authorization' not in self.session.headers:
+            return None
+        auth = self.session.headers['Authorization']
+        if not auth.startswith('Bearer '):
+            return None
+        return auth.split()[-1]
+
+    @property
+    def has_auth(self):
+        if self.username is not None and self.password is not None:
+            return True
+        if self.token is not None:
+            return True
+        return False

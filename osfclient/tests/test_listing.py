@@ -24,7 +24,8 @@ def test_anonymous_doesnt_use_password(MockOSF):
     # if there is no username we should not try to obtain a password either
     assert call('OSF_USERNAME') in mock_getenv.mock_calls
     assert call('OSF_PASSWORD') not in mock_getenv.mock_calls
-    MockOSF.assert_called_once_with(username=None, password=None)
+    MockOSF.assert_called_once_with(username=None, password=None, token=None,
+                                    base_url=None)
 
 
 @patch('osfclient.cli.OSF')
@@ -40,8 +41,45 @@ def test_username_password(MockOSF):
         list_(args)
 
     MockOSF.assert_called_once_with(username='joe@example.com',
-                                    password='secret')
+                                    password='secret', token=None,
+                                    base_url=None)
     mock_getenv.assert_called_with('OSF_PASSWORD')
+
+
+@patch('osfclient.cli.OSF')
+def test_token(MockOSF):
+    args = MockArgs(project='1234')
+
+    def simple_getenv(key):
+        if key == 'OSF_TOKEN':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv',
+               side_effect=simple_getenv) as mock_getenv:
+        list_(args)
+
+    MockOSF.assert_called_once_with(username=None,
+                                    password=None, token='secret',
+                                    base_url=None)
+    mock_getenv.assert_called_with('OSF_TOKEN')
+
+
+@patch('osfclient.cli.OSF')
+def test_base_url(MockOSF):
+    args = MockArgs(base_url='https://api.test.osf.io/v2/', project='1234')
+
+    def simple_getenv(key):
+        if key == 'OSF_TOKEN':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv',
+               side_effect=simple_getenv) as mock_getenv:
+        list_(args)
+
+    MockOSF.assert_called_once_with(username=None,
+                                    password=None, token='secret',
+                                    base_url='https://api.test.osf.io/v2/')
+    mock_getenv.assert_called_with('OSF_TOKEN')
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))

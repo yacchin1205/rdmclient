@@ -30,6 +30,8 @@ def main():
     parser.add_argument('-u', '--username', default=None,
                         help=('OSF username. Provide your password via '
                               'OSF_PASSWORD environment variable'))
+    parser.add_argument('--base-url', default=None,
+                        help='OSF API URL (Default is https://api.osf.io/v2/)')
     parser.add_argument('-p', '--project', default=None,
                         help='OSF project ID')
     parser.add_argument('-v', '--version', action='version',

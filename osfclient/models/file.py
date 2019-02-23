@@ -201,9 +201,3 @@ class _WaterButlerFolder(OSFCore, ContainerMixin):
         self._new_folder_url = self._get_attribute(file, 'links', 'new_folder')
         self._new_file_url = self._get_attribute(file, 'links', 'upload')
         self._move_url = self._get_attribute(file, 'links', 'move')
-
-    @property
-    def full_folder(self):
-        base_url = "https://api.osf.io/v2/files"
-        folder = self._json(self._get(base_url % self.osf_path), 200)
-        return Folder(folder, self.session)

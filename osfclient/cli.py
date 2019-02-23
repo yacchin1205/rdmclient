@@ -53,6 +53,18 @@ def _get_username(args, config):
     return username
 
 
+def _get_base_url(args, config):
+    if args.base_url is None:
+        base_url = config.get('base_url')
+    else:
+        base_url = args.base_url
+    return base_url
+
+
+def _get_token():
+    return os.getenv('OSF_TOKEN')
+
+
 def _setup_osf(args):
     # Command line options have precedence over environment variables,
     # which have precedence over the config file.
@@ -68,15 +80,20 @@ def _setup_osf(args):
         sys.exit('You have to specify a project ID via the command line,'
                  ' configuration file or environment variable.')
 
+    base_url = _get_base_url(args, config)
     password = None
+    token = None
     if username is not None:
         password = os.getenv("OSF_PASSWORD")
 
         # Prompt user when password is not set
         if password is None:
             password = getpass.getpass('Please input your password: ')
+    else:
+        token = _get_token()
 
-    return OSF(username=username, password=password)
+    return OSF(username=username, password=password, token=token,
+               base_url=base_url)
 
 
 def might_need_auth(f):
@@ -92,9 +109,11 @@ def might_need_auth(f):
         except UnauthorizedException as e:
             config = config_from_env(config_from_file())
             username = _get_username(cli_args, config)
+            token = _get_token()
 
-            if username is None:
-                sys.exit("Please set a username (run `osf -h` for details).")
+            if username is None and token is None:
+                sys.exit("Please set a username or token "
+                         "(run `osf -h` for details).")
             else:
                 sys.exit("You are not authorized to access this project.")
 
@@ -142,7 +161,7 @@ def clone(args):
 
     The output directory defaults to the current directory.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
 
     If args.update is True, overwrite any existing local files only if local and
     remote files differ.
@@ -185,7 +204,7 @@ def fetch(args):
 
     The local path defaults to the name of the remote file.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
 
     If args.force is True, write local file even if that file already exists.
     If args.force is False but args.update is True, overwrite an existing local
@@ -226,7 +245,7 @@ def fetch(args):
 def list_(args):
     """List all files from all storages for project.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
     """
     osf = _setup_osf(args)
 
@@ -250,7 +269,7 @@ def upload(args):
     storage provider. If there is no match the default (osfstorage) is
     used.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
 
     To upload a whole directory (and all its sub-directories) use the `-r`
     command-line option. If your source directory name ends in a / then
@@ -264,9 +283,9 @@ def upload(args):
     $ osf upload -r foo/ bar
     """
     osf = _setup_osf(args)
-    if osf.username is None or osf.password is None:
+    if not osf.has_auth:
         sys.exit('To upload a file you need to provide a username and'
-                 ' password.')
+                 ' password or token.')
 
     project = osf.project(args.project)
     storage, remote_path = split_storage(args.destination)
@@ -306,9 +325,9 @@ def remove(args):
     used.
     """
     osf = _setup_osf(args)
-    if osf.username is None or osf.password is None:
+    if not osf.has_auth:
         sys.exit('To remove a file you need to provide a username and'
-                 ' password.')
+                 ' password or token.')
 
     project = osf.project(args.project)
 
