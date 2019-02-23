@@ -151,6 +151,42 @@ def test_long_format_list(capsys):
     assert captured.out.split('\n') == expected
 
 
+def test_long_format_list_with_null(capsys):
+    args = MockArgs(project='f3szh', long_format=True)
+
+    dates = ['null', 'null']
+    njson = fake_responses._build_node('nodes')
+    fjson = fake_responses.files_node('f3szh', 'osfstorage',
+                                      file_names=['hello.txt', 'bye.txt'],
+                                      file_sizes=['null', 'null'],
+                                      file_dates_modified=dates)
+    sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
+
+    def simple_OSFCore_get(url):
+        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+            return FakeResponse(200, njson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+            return FakeResponse(200, sjson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+            return FakeResponse(200, fjson)
+        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+            return FakeResponse(200, {'data': {'type': 'nodes'}})
+        else:
+            print(url)
+            raise ValueError()
+
+    with patch('osfclient.cli.get_localzone',
+               return_value=tz.tzutc()) as mock_get_localzone:
+        with patch.object(OSFCore, '_get',
+                          side_effect=simple_OSFCore_get) as mock_osf_get:
+            list_(args)
+    captured = capsys.readouterr()
+    assert captured.err == ''
+    expected = ['- - - osfstorage/bye.txt',
+                '- - - osfstorage/hello.txt', '']
+    assert captured.out.split('\n') == expected
+
+
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 def test_get_project(OSF_project):
     args = MockArgs(project='1234')

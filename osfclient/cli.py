@@ -261,10 +261,17 @@ def list_(args):
                 path = path[1:]
             full_path = os.path.join(prefix, path)
             if args.long_format:
-                modified = dateutil.parser.parse(file_.date_modified)
-                modified = modified.astimezone(get_localzone())
-                print('%s %d %s' % (modified.strftime('%Y-%m-%d %H:%M:%S'),
-                                    file_.size, full_path))
+                if file_.date_modified is not None:
+                    modified = dateutil.parser.parse(file_.date_modified)
+                    modified = modified.astimezone(get_localzone())
+                    smodified = modified.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    smodified = '- -'
+                if file_.size is not None:
+                    sfsize = str(file_.size)
+                else:
+                    sfsize = '-'
+                print('%s %s %s' % (smodified, sfsize, full_path))
             else:
                 print(full_path)
 
