@@ -7,43 +7,91 @@ from osfclient.utils import split_storage
 
 
 def test_default_storage():
-    store, path = split_storage('foo/bar/baz')
-    assert store == 'osfstorage'
-    assert path == 'foo/bar/baz'
+    def simple_getenv(key):
+        return None
 
-    store, path = split_storage('/foo/bar/baz')
-    assert store == 'osfstorage'
-    assert path == 'foo/bar/baz'
+    with patch('osfclient.cli.os.getenv',
+               side_effect=simple_getenv) as mock_getenv:
+        store, path = split_storage('foo/bar/baz')
+        assert store == 'osfstorage'
+        assert path == 'foo/bar/baz'
+
+        store, path = split_storage('/foo/bar/baz')
+        assert store == 'osfstorage'
+        assert path == 'foo/bar/baz'
 
 
 def test_split_storage():
-    store, path = split_storage('osfstorage/foo/bar/baz')
-    assert store == 'osfstorage'
-    assert path == 'foo/bar/baz'
+    def simple_getenv(key):
+        return None
 
-    store, path = split_storage('github/foo/bar/baz')
-    assert store == 'github'
-    assert path == 'foo/bar/baz'
+    with patch('osfclient.cli.os.getenv',
+               side_effect=simple_getenv) as mock_getenv:
+        store, path = split_storage('osfstorage/foo/bar/baz')
+        assert store == 'osfstorage'
+        assert path == 'foo/bar/baz'
 
-    store, path = split_storage('/github/foo/bar/baz')
-    assert store == 'github'
-    assert path == 'foo/bar/baz'
+        store, path = split_storage('github/foo/bar/baz')
+        assert store == 'github'
+        assert path == 'foo/bar/baz'
 
-    store, path = split_storage('figshare/foo/bar/baz')
-    assert store == 'figshare'
-    assert path == 'foo/bar/baz'
+        store, path = split_storage('/github/foo/bar/baz')
+        assert store == 'github'
+        assert path == 'foo/bar/baz'
 
-    store, path = split_storage('/figshare/foo/bar/baz')
-    assert store == 'figshare'
-    assert path == 'foo/bar/baz'
+        store, path = split_storage('figshare/foo/bar/baz')
+        assert store == 'figshare'
+        assert path == 'foo/bar/baz'
 
-    store, path = split_storage('googledrive/foo/bar/baz')
-    assert store == 'googledrive'
-    assert path == 'foo/bar/baz'
+        store, path = split_storage('/figshare/foo/bar/baz')
+        assert store == 'figshare'
+        assert path == 'foo/bar/baz'
 
-    store, path = split_storage('/googledrive/foo/bar/baz')
-    assert store == 'googledrive'
-    assert path == 'foo/bar/baz'
+        store, path = split_storage('googledrive/foo/bar/baz')
+        assert store == 'googledrive'
+        assert path == 'foo/bar/baz'
+
+        store, path = split_storage('/googledrive/foo/bar/baz')
+        assert store == 'googledrive'
+        assert path == 'foo/bar/baz'
+
+
+def test_custom_split_storage():
+    def simple_getenv(key):
+        if key == 'KNOWN_PROVIDERS':
+            return 'osfstorage,s3,github'
+        return None
+
+    with patch('osfclient.cli.os.getenv',
+               side_effect=simple_getenv) as mock_getenv:
+        store, path = split_storage('osfstorage/foo/bar/baz')
+        assert store == 'osfstorage'
+        assert path == 'foo/bar/baz'
+
+        store, path = split_storage('github/foo/bar/baz')
+        assert store == 'github'
+        assert path == 'foo/bar/baz'
+
+        store, path = split_storage('/github/foo/bar/baz')
+        assert store == 'github'
+        assert path == 'foo/bar/baz'
+
+        store, path = split_storage('figshare/foo/bar/baz')
+        assert store == 'osfstorage'
+        assert path == 'figshare/foo/bar/baz'
+
+        store, path = split_storage('/figshare/foo/bar/baz')
+        assert store == 'osfstorage'
+        assert path == 'figshare/foo/bar/baz'
+
+        store, path = split_storage('s3/foo/bar/baz')
+        assert store == 's3'
+        assert path == 'foo/bar/baz'
+
+        store, path = split_storage('/s3/foo/bar/baz')
+        assert store == 's3'
+        assert path == 'foo/bar/baz'
+
 
 def test_norm_remote_path():
     path = 'foo/bar/baz.txt'
