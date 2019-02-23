@@ -125,12 +125,16 @@ def test_might_need_auth_unauthorized(config_from_file):
 @patch('osfclient.cli.config_from_env', return_value={'project': 'pj2'})
 def test_might_need_auth_no_username(config_from_file):
     mock_args = MockArgs(project='test')
+    def simple_getenv(key):
+        return None
 
     @cli.might_need_auth
     def dummy(x):
         raise UnauthorizedException()
 
     with pytest.raises(SystemExit) as e:
-        dummy(mock_args)
+        with patch('osfclient.cli.os.getenv',
+                   side_effect=simple_getenv) as mock_getenv:
+            dummy(mock_args)
 
     assert "set a username" in str(e.value)

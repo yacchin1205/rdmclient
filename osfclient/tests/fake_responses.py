@@ -313,6 +313,7 @@ def _folder(osf_id, name, storage='osfstorage'):
 
 
 def files_node(project_id, storage, file_names=['hello.txt'],
+               file_sizes=None, file_dates_modified=None,
                folder_names=None):
     a_file = """{
     "relationships": {
@@ -352,7 +353,7 @@ def files_node(project_id, storage, file_names=['hello.txt'],
         "name": "%(fname)s",
         "last_touched": "2017-03-20T16:24:57.417044",
         "materialized_path": "/%(fname)s",
-        "date_modified": null,
+        "date_modified": %(date_modified)s,
         "current_version": 1,
         "date_created": null,
         "provider": "%(storage)s",
@@ -361,15 +362,22 @@ def files_node(project_id, storage, file_names=['hello.txt'],
         "guid": null,
         "checkout": null,
         "tags": [],
-        "size": null
+        "size": %(fsize)s
     },
     "type": "files",
     "id": "58becc229ad5a101f98293a3"
 }"""
     files = []
-    for fname in file_names:
+    if file_dates_modified is None:
+        file_dates_modified = ['null' for fname in file_names]
+    if file_sizes is None:
+        file_sizes = ['null' for fname in file_names]
+    for fname, fsize, date_modified in zip(file_names, file_sizes,
+                                           file_dates_modified):
         files.append(json.loads(a_file % dict(storage=storage,
                                               fname=fname,
+                                              fsize=fsize,
+                                              date_modified=date_modified,
                                               project_id=project_id)))
 
     if folder_names is not None:

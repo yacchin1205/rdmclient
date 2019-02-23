@@ -1,3 +1,5 @@
 requests
 tqdm
 six
+python-dateutil
+tzlocal

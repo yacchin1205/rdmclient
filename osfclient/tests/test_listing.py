@@ -1,13 +1,17 @@
 """Test `osf ls` command"""
 
+from dateutil import tz
 from mock import call
 from mock import patch
 
 from osfclient import OSF
 from osfclient.cli import list_
+from osfclient.models import OSFCore
 
+from osfclient.tests import fake_responses
 from osfclient.tests.mocks import MockProject
 from osfclient.tests.mocks import MockArgs
+from osfclient.tests.mocks import FakeResponse
 
 
 @patch('osfclient.cli.OSF')
@@ -80,6 +84,71 @@ def test_base_url(MockOSF):
                                     password=None, token='secret',
                                     base_url='https://api.test.osf.io/v2/')
     mock_getenv.assert_called_with('OSF_TOKEN')
+
+def test_list(capsys):
+    args = MockArgs(project='f3szh')
+
+    njson = fake_responses._build_node('nodes')
+    fjson = fake_responses.files_node('f3szh', 'osfstorage',
+                                      file_names=['hello.txt', 'bye.txt'])
+    sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
+
+    def simple_OSFCore_get(url):
+        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+            return FakeResponse(200, njson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+            return FakeResponse(200, sjson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+            return FakeResponse(200, fjson)
+        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+            return FakeResponse(200, {'data': {'type': 'nodes'}})
+        else:
+            print(url)
+            raise ValueError()
+
+    with patch.object(OSFCore, '_get',
+                      side_effect=simple_OSFCore_get) as mock_osf_get:
+        list_(args)
+    captured = capsys.readouterr()
+    assert captured.err == ''
+    assert captured.out.split('\n') == ['osfstorage/bye.txt',
+                                        'osfstorage/hello.txt', '']
+
+
+def test_long_format_list(capsys):
+    args = MockArgs(project='f3szh', long_format=True)
+
+    dates = ['"2019-02-20T14:02:00.000000Z"', '"2019-02-19T17:01:00.000000Z"']
+    njson = fake_responses._build_node('nodes')
+    fjson = fake_responses.files_node('f3szh', 'osfstorage',
+                                      file_names=['hello.txt', 'bye.txt'],
+                                      file_sizes=['5', '3'],
+                                      file_dates_modified=dates)
+    sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
+
+    def simple_OSFCore_get(url):
+        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+            return FakeResponse(200, njson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+            return FakeResponse(200, sjson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+            return FakeResponse(200, fjson)
+        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+            return FakeResponse(200, {'data': {'type': 'nodes'}})
+        else:
+            print(url)
+            raise ValueError()
+
+    with patch('osfclient.cli.get_localzone',
+               return_value=tz.tzutc()) as mock_get_localzone:
+        with patch.object(OSFCore, '_get',
+                          side_effect=simple_OSFCore_get) as mock_osf_get:
+            list_(args)
+    captured = capsys.readouterr()
+    assert captured.err == ''
+    expected = ['2019-02-19 17:01:00 3 osfstorage/bye.txt',
+                '2019-02-20 14:02:00 5 osfstorage/hello.txt', '']
+    assert captured.out.split('\n') == expected
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))

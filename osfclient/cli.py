@@ -13,6 +13,8 @@ from six.moves import configparser
 from six.moves import input
 
 from tqdm import tqdm
+import dateutil.parser
+from tzlocal import get_localzone
 
 from .api import OSF
 from .exceptions import UnauthorizedException
@@ -257,8 +259,14 @@ def list_(args):
             path = file_.path
             if path.startswith('/'):
                 path = path[1:]
-
-            print(os.path.join(prefix, path))
+            full_path = os.path.join(prefix, path)
+            if args.long_format:
+                modified = dateutil.parser.parse(file_.date_modified)
+                modified = modified.astimezone(get_localzone())
+                print('%s %d %s' % (modified.strftime('%Y-%m-%d %H:%M:%S'),
+                                    file_.size, full_path))
+            else:
+                print(full_path)
 
 
 @might_need_auth
