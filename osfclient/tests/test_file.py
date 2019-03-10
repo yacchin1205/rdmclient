@@ -190,3 +190,80 @@ def test_remove_file_failed():
     assert f._delete.called
 
     assert 'Could not delete' in e.value.args[0]
+
+
+def test_move_file_to_dir():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder)
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/'})
+
+
+def test_move_file_to_specified_dir_and_file():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, to_filename='newname')
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'rename': 'newname'})
+
+
+def test_move_file_to_specified_file():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, to_filename='newname')
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'rename': 'newname'})
+
+
+def test_force_move_file():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, force=True)
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'conflict': 'replace'})
+
+
+def test_move_file_failed():
+    f = File({})
+    f.path = 'some/path'
+    f._move_url = 'http://move.me/uri'
+    # TODO
+    f._post = MagicMock(return_value=FakeResponse(204, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    with pytest.raises(RuntimeError) as e:
+        f.move_to('osfclient', folder)
+
+    assert f._post.called
+
+    assert 'Could not move' in e.value.args[0]

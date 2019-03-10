@@ -352,3 +352,63 @@ def remove(args):
     for f in store.files:
         if norm_remote_path(f.path) == remote_path:
             f.remove()
+
+
+@might_need_auth
+def move(args):
+    """Move a file to specified location on the project's storage.
+
+    The first part of the paths is interpreted as the name of the
+    storage provider. If there is no match the default (osfstorage) is
+    used.
+    """
+    osf = _setup_osf(args)
+    if not osf.has_auth:
+        sys.exit('To move a file you need to provide a username and'
+                 ' password or token.')
+
+    project = osf.project(args.project)
+
+    target_storage, target_path = split_storage(args.target, normalize=False)
+
+    if target_path.endswith('/'):
+        target_folder_path = target_path[:-1]
+        target_filename = None
+    elif '/' in target_path:
+        sep = target_path.index('/')
+        target_folder_path = target_path[:sep]
+        target_filename = target_path[sep + 1:]
+    elif target_path == '':
+        target_folder_path = None
+        target_filename = None
+    else:
+        target_folder_path = None
+        target_filename = target_path
+    target_store = project.storage(target_storage)
+    if target_folder_path is None:
+        target_folder = target_store
+    else:
+        target_folder = _ensure_folder(target_store, target_folder_path)
+
+    # Move a file
+    storage, remote_path = split_storage(args.source)
+
+    store = project.storage(storage)
+    for f in store.files:
+        if norm_remote_path(f.path) == remote_path:
+            f.move_to(target_storage, target_folder,
+                      to_filename=target_filename, force=args.force)
+
+
+def _ensure_folder(store, path):
+    folder = None
+    for f in store.folders:
+        if norm_remote_path(f.path) == path:
+            folder = f
+    if folder is not None:
+        return folder
+    if '/' in path:
+        parent = _ensure_folder(store, path[:path.index('/')])
+        return parent.create_folder(path[path.index('/') + 1:])
+    else:
+        return store.create_folder(path)

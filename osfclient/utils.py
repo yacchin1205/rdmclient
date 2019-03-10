@@ -22,14 +22,15 @@ def norm_remote_path(path):
         return path
 
 
-def split_storage(path, default='osfstorage'):
+def split_storage(path, default='osfstorage', normalize=True):
     """Extract storage name from file path.
 
     If a path begins with a known storage provider the name is removed
     from the path. Otherwise the `default` storage provider is returned
     and the path is not modified.
     """
-    path = norm_remote_path(path)
+    if normalize:
+        path = norm_remote_path(path)
     env_known_providers = os.getenv('KNOWN_PROVIDERS')
     if env_known_providers is not None:
         known_providers = env_known_providers.split(',')

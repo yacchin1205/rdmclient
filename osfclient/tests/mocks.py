@@ -29,7 +29,9 @@ def MockFolder(name):
 
 def MockStorage(name):
     mock = MagicMock(name='Storage-%s' % name,
-                     files=[MockFile('/a/a/a'), MockFile('b/b/b')])
+                     files=[MockFile('/a/a/a'), MockFile('b/b/b')],
+                     folders=[MockFolder('/a'), MockFolder('/a/a'),
+                              MockFolder('/c'), MockFolder('/c/c')])
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name

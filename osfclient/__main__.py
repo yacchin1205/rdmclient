@@ -4,7 +4,7 @@ import six
 import argparse
 from textwrap import dedent
 
-from .cli import clone, fetch, list_, remove, upload, init
+from .cli import clone, fetch, list_, remove, move, upload, init
 from . import __version__
 
 
@@ -21,6 +21,7 @@ def main():
         list      List all files from all storages for a project
         upload    Upload a new file to an existing project
         remove    Remove a file from a project's storage
+        move      Move a file to specified location on the project's storage.
 
     See 'osf <command> -h' to read about a specific command.
     """)
@@ -103,6 +104,15 @@ def main():
     remove_parser = _add_subparser('remove', remove.__doc__, aliases=['rm'])
     remove_parser.set_defaults(func=remove)
     remove_parser.add_argument('target', help='Remote file path')
+
+    # Move a file
+    move_parser = _add_subparser('move', move.__doc__, aliases=['mv'])
+    move_parser.set_defaults(func=move)
+    move_parser.add_argument('source', help='File path to move')
+    move_parser.add_argument('target', help='Target file path')
+    move_parser.add_argument('-f', '--force',
+                             help='Force overwriting of target file',
+                             action='store_true')
 
     # Python2 argparse exits with an error when no command is given
     if six.PY2 and len(sys.argv) == 1:
