@@ -369,15 +369,18 @@ def move(args):
 
     project = osf.project(args.project)
 
-    target_storage, target_path = split_storage(args.target)
+    target_storage, target_path = split_storage(args.target, normalize=False)
 
-    if args.target.endswith('/'):
-        target_folder_path = target_path
+    if target_path.endswith('/'):
+        target_folder_path = target_path[:-1]
         target_filename = None
     elif '/' in target_path:
         sep = target_path.index('/')
         target_folder_path = target_path[:sep]
         target_filename = target_path[sep + 1:]
+    elif target_path == '':
+        target_folder_path = None
+        target_filename = None
     else:
         target_folder_path = None
         target_filename = target_path

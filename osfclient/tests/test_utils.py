@@ -55,6 +55,14 @@ def test_split_storage():
         assert store == 'googledrive'
         assert path == 'foo/bar/baz'
 
+        store, path = split_storage('osfstorage/foo/bar/baz/')
+        assert store == 'osfstorage'
+        assert path == 'foo/bar/baz'
+
+        store, path = split_storage('osfstorage/foo/bar/baz/', normalize=False)
+        assert store == 'osfstorage'
+        assert path == 'foo/bar/baz/'
+
 
 def test_custom_split_storage():
     def simple_getenv(key):
