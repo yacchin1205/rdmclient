@@ -29,6 +29,7 @@ class File(OSFCore):
         self._download_url = self._get_attribute(file, 'links', 'download')
         self._upload_url = self._get_attribute(file, 'links', 'upload')
         self._delete_url = self._get_attribute(file, 'links', 'delete')
+        self._move_url = self._get_attribute(file, 'links', 'move')
         self.osf_path = self._get_attribute(file, 'attributes', 'path')
         self.path = self._get_attribute(file,
                                         'attributes', 'materialized_path')
@@ -91,6 +92,23 @@ class File(OSFCore):
             msg = ('Could not update {} (status '
                    'code: {}).'.format(self.path, response.status_code))
             raise RuntimeError(msg)
+
+    def move_to(self, storage, to_folder, to_filename=None, force=False):
+        """Move this file to the remote storage."""
+        try:
+            path = to_folder.osf_path
+        except AttributeError:
+            path = to_folder.path
+        body = {'action': 'move', 'path': path}
+        if to_filename is not None:
+            body['rename'] = to_filename
+        if force:
+            body['conflict'] = 'replace'
+        response = self._post(self._move_url, json=body)
+        if response.status_code != 200 and response.status_code != 201:
+            raise RuntimeError('Could not move {} (status '
+                               'code: {}).'.format(self.path,
+                                                   response.status_code))
 
 
 class ContainerMixin:
