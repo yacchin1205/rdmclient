@@ -43,12 +43,13 @@ def test_move_file_to_dir(OSF_project):
     MockProject = OSF_project.return_value
     MockStorage = MockProject._storage_mock.return_value
     for f in MockStorage.files:
+        mock_calls = list(f.mock_calls)
         if f._path_mock.return_value == '/a/a/a':
             assert call.move_to('osfstorage',
                                 [f for f in MockStorage.folders
                                  if f.path == '/c'][0],
                                 to_filename=None,
-                                force=False) in f.mock_calls
+                                force=False) in mock_calls
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
@@ -68,12 +69,13 @@ def test_move_file_to_sub_dir(OSF_project):
     MockProject = OSF_project.return_value
     MockStorage = MockProject._storage_mock.return_value
     for f in MockStorage.files:
+        mock_calls = list(f.mock_calls)
         if f._path_mock.return_value == '/a/a/a':
             assert call.move_to('osfstorage',
                                 [f for f in MockStorage.folders
                                  if f.path == '/c/c'][0],
                                 to_filename=None,
-                                force=False) in f.mock_calls
+                                force=False) in mock_calls
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
@@ -93,12 +95,13 @@ def test_move_file_to_file(OSF_project):
     MockProject = OSF_project.return_value
     MockStorage = MockProject._storage_mock.return_value
     for f in MockStorage.files:
+        mock_calls = list(f.mock_calls)
         if f._path_mock.return_value == '/a/a/a':
             assert call.move_to('osfstorage',
                                 [f for f in MockStorage.folders
                                  if f.path == '/c'][0],
                                 to_filename='newfile',
-                                force=False) in f.mock_calls
+                                force=False) in mock_calls
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
