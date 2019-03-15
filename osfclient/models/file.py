@@ -1,7 +1,7 @@
 from tqdm import tqdm
 
 from .core import OSFCore
-from ..exceptions import FolderExistsException
+from ..exceptions import FolderExistsException, UnauthorizedException
 
 
 def copyfileobj(fsrc, fdst, total, length=16*1024):
@@ -54,7 +54,10 @@ class File(OSFCore):
         if 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
-        response = self._get(self._download_url, stream=True)
+        try:
+            response = self._get(self._download_url, stream=True)
+        except UnauthorizedException:
+            response = self._get(self._upload_url, stream=True)
         if response.status_code == 200:
             response.raw.decode_content = True
             copyfileobj(response.raw, fp,
