@@ -29,7 +29,9 @@ def MockFolder(name):
 
 def MockStorage(name):
     mock = MagicMock(name='Storage-%s' % name,
-                     files=[MockFile('/a/a/a'), MockFile('b/b/b')])
+                     files=[MockFile('/a/a/a'), MockFile('b/b/b')],
+                     folders=[MockFolder('/a'), MockFolder('/a/a'),
+                              MockFolder('/c'), MockFolder('/c/c')])
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
@@ -49,10 +51,11 @@ def MockProject(name):
 
 def MockArgs(username=None, password=None, output=None, project=None,
              source=None, destination=None, local=None, remote=None,
-             target=None, force=False, update=False, recursive=False):
+             target=None, force=False, update=False, recursive=False,
+             base_url=None, long_format=False):
     args = MagicMock(spec=['username', 'password', 'output', 'project',
                            'source', 'destination', 'target', 'force',
-                           'recursive'])
+                           'recursive', 'base_url', 'long_format'])
     args._username_mock = PropertyMock(return_value=username)
     type(args).username = args._username_mock
     args._password_mock = PropertyMock(return_value=password)
@@ -62,6 +65,8 @@ def MockArgs(username=None, password=None, output=None, project=None,
     type(args).output = args._output_mock
     args._project_mock = PropertyMock(return_value=project)
     type(args).project = args._project_mock
+    args._base_url_mock = PropertyMock(return_value=base_url)
+    type(args).base_url = args._base_url_mock
 
     args._source_mock = PropertyMock(return_value=source)
     type(args).source = args._source_mock
@@ -75,6 +80,9 @@ def MockArgs(username=None, password=None, output=None, project=None,
     type(args).remote = args._remote_mock
     args._local_mock = PropertyMock(return_value=local)
     type(args).local = args._local_mock
+
+    args._long_format_mock = PropertyMock(return_value=long_format)
+    type(args).long_format = args._long_format_mock
 
     args._force_mock = PropertyMock(return_value=force)
     type(args).force = args._force_mock

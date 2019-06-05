@@ -4,7 +4,7 @@ import six
 import argparse
 from textwrap import dedent
 
-from .cli import clone, fetch, list_, remove, upload, init
+from .cli import clone, fetch, list_, remove, move, upload, init
 from . import __version__
 
 
@@ -21,6 +21,7 @@ def main():
         list      List all files from all storages for a project
         upload    Upload a new file to an existing project
         remove    Remove a file from a project's storage
+        move      Move a file to specified location on the project's storage.
 
     See 'osf <command> -h' to read about a specific command.
     """)
@@ -30,6 +31,8 @@ def main():
     parser.add_argument('-u', '--username', default=None,
                         help=('OSF username. Provide your password via '
                               'OSF_PASSWORD environment variable'))
+    parser.add_argument('--base-url', default=None,
+                        help='OSF API URL (Default is https://api.osf.io/v2/)')
     parser.add_argument('-p', '--project', default=None,
                         help='OSF project ID')
     parser.add_argument('-v', '--version', action='version',
@@ -77,6 +80,9 @@ def main():
 
     # List all files in a project
     list_parser = _add_subparser('list', list.__doc__, aliases=['ls'])
+    list_parser.add_argument('-l', '--long-format',
+                              help='Listing in long format',
+                              action='store_true')
     list_parser.set_defaults(func=list_)
 
     # Upload a single file or a directory tree
@@ -98,6 +104,15 @@ def main():
     remove_parser = _add_subparser('remove', remove.__doc__, aliases=['rm'])
     remove_parser.set_defaults(func=remove)
     remove_parser.add_argument('target', help='Remote file path')
+
+    # Move a file
+    move_parser = _add_subparser('move', move.__doc__, aliases=['mv'])
+    move_parser.set_defaults(func=move)
+    move_parser.add_argument('source', help='File path to move')
+    move_parser.add_argument('target', help='Target file path')
+    move_parser.add_argument('-f', '--force',
+                             help='Force overwriting of target file',
+                             action='store_true')
 
     # Python2 argparse exits with an error when no command is given
     if six.PY2 and len(sys.argv) == 1:

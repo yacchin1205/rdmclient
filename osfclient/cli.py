@@ -13,6 +13,8 @@ from six.moves import configparser
 from six.moves import input
 
 from tqdm import tqdm
+import dateutil.parser
+from tzlocal import get_localzone
 
 from .api import OSF
 from .exceptions import UnauthorizedException
@@ -53,6 +55,18 @@ def _get_username(args, config):
     return username
 
 
+def _get_base_url(args, config):
+    if args.base_url is None:
+        base_url = config.get('base_url')
+    else:
+        base_url = args.base_url
+    return base_url
+
+
+def _get_token():
+    return os.getenv('OSF_TOKEN')
+
+
 def _setup_osf(args):
     # Command line options have precedence over environment variables,
     # which have precedence over the config file.
@@ -68,15 +82,20 @@ def _setup_osf(args):
         sys.exit('You have to specify a project ID via the command line,'
                  ' configuration file or environment variable.')
 
+    base_url = _get_base_url(args, config)
     password = None
+    token = None
     if username is not None:
         password = os.getenv("OSF_PASSWORD")
 
         # Prompt user when password is not set
         if password is None:
             password = getpass.getpass('Please input your password: ')
+    else:
+        token = _get_token()
 
-    return OSF(username=username, password=password)
+    return OSF(username=username, password=password, token=token,
+               base_url=base_url)
 
 
 def might_need_auth(f):
@@ -92,9 +111,11 @@ def might_need_auth(f):
         except UnauthorizedException as e:
             config = config_from_env(config_from_file())
             username = _get_username(cli_args, config)
+            token = _get_token()
 
-            if username is None:
-                sys.exit("Please set a username (run `osf -h` for details).")
+            if username is None and token is None:
+                sys.exit("Please set a username or token "
+                         "(run `osf -h` for details).")
             else:
                 sys.exit("You are not authorized to access this project.")
 
@@ -142,7 +163,7 @@ def clone(args):
 
     The output directory defaults to the current directory.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
 
     If args.update is True, overwrite any existing local files only if local and
     remote files differ.
@@ -185,7 +206,7 @@ def fetch(args):
 
     The local path defaults to the name of the remote file.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
 
     If args.force is True, write local file even if that file already exists.
     If args.force is False but args.update is True, overwrite an existing local
@@ -226,7 +247,7 @@ def fetch(args):
 def list_(args):
     """List all files from all storages for project.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
     """
     osf = _setup_osf(args)
 
@@ -238,8 +259,21 @@ def list_(args):
             path = file_.path
             if path.startswith('/'):
                 path = path[1:]
-
-            print(os.path.join(prefix, path))
+            full_path = os.path.join(prefix, path)
+            if args.long_format:
+                if file_.date_modified is not None:
+                    modified = dateutil.parser.parse(file_.date_modified)
+                    modified = modified.astimezone(get_localzone())
+                    smodified = modified.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    smodified = '- -'
+                if file_.size is not None:
+                    sfsize = str(file_.size)
+                else:
+                    sfsize = '-'
+                print('%s %s %s' % (smodified, sfsize, full_path))
+            else:
+                print(full_path)
 
 
 @might_need_auth
@@ -250,7 +284,7 @@ def upload(args):
     storage provider. If there is no match the default (osfstorage) is
     used.
 
-    If the project is private you need to specify a username.
+    If the project is private you need to specify a username or token.
 
     To upload a whole directory (and all its sub-directories) use the `-r`
     command-line option. If your source directory name ends in a / then
@@ -264,9 +298,9 @@ def upload(args):
     $ osf upload -r foo/ bar
     """
     osf = _setup_osf(args)
-    if osf.username is None or osf.password is None:
+    if not osf.has_auth:
         sys.exit('To upload a file you need to provide a username and'
-                 ' password.')
+                 ' password or token.')
 
     project = osf.project(args.project)
     storage, remote_path = split_storage(args.destination)
@@ -306,9 +340,9 @@ def remove(args):
     used.
     """
     osf = _setup_osf(args)
-    if osf.username is None or osf.password is None:
+    if not osf.has_auth:
         sys.exit('To remove a file you need to provide a username and'
-                 ' password.')
+                 ' password or token.')
 
     project = osf.project(args.project)
 
@@ -318,3 +352,63 @@ def remove(args):
     for f in store.files:
         if norm_remote_path(f.path) == remote_path:
             f.remove()
+
+
+@might_need_auth
+def move(args):
+    """Move a file to specified location on the project's storage.
+
+    The first part of the paths is interpreted as the name of the
+    storage provider. If there is no match the default (osfstorage) is
+    used.
+    """
+    osf = _setup_osf(args)
+    if not osf.has_auth:
+        sys.exit('To move a file you need to provide a username and'
+                 ' password or token.')
+
+    project = osf.project(args.project)
+
+    target_storage, target_path = split_storage(args.target, normalize=False)
+
+    if target_path.endswith('/'):
+        target_folder_path = target_path[:-1]
+        target_filename = None
+    elif '/' in target_path:
+        sep = target_path.index('/')
+        target_folder_path = target_path[:sep]
+        target_filename = target_path[sep + 1:]
+    elif target_path == '':
+        target_folder_path = None
+        target_filename = None
+    else:
+        target_folder_path = None
+        target_filename = target_path
+    target_store = project.storage(target_storage)
+    if target_folder_path is None:
+        target_folder = target_store
+    else:
+        target_folder = _ensure_folder(target_store, target_folder_path)
+
+    # Move a file
+    storage, remote_path = split_storage(args.source)
+
+    store = project.storage(storage)
+    for f in store.files:
+        if norm_remote_path(f.path) == remote_path:
+            f.move_to(target_storage, target_folder,
+                      to_filename=target_filename, force=args.force)
+
+
+def _ensure_folder(store, path):
+    folder = None
+    for f in store.folders:
+        if norm_remote_path(f.path) == path:
+            folder = f
+    if folder is not None:
+        return folder
+    if '/' in path:
+        parent = _ensure_folder(store, path[:path.index('/')])
+        return parent.create_folder(path[path.index('/') + 1:])
+    else:
+        return store.create_folder(path)

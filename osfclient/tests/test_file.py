@@ -9,7 +9,7 @@ import pytest
 from osfclient.models import OSFCore
 from osfclient.models import File
 from osfclient.models import Folder
-from osfclient.exceptions import FolderExistsException
+from osfclient.exceptions import FolderExistsException, UnauthorizedException
 from osfclient.models.file import _WaterButlerFolder
 
 from osfclient.tests import fake_responses
@@ -178,6 +178,40 @@ def test_file_uses_streaming_request():
     assert expected in mock_get.mock_calls
 
 
+def test_file_with_new_api():
+    # check we use streaming mode to fetch files
+    fp = io.BytesIO(b"")
+    fp.mode = "b"
+    file_content = b"hello world"
+
+    web_url = "http://example.com/download_url/"
+    api_url = "http://example.com/upload_url/"
+
+    def fake_get(url, stream):
+        raw = MagicMock()
+        src = io.BytesIO(file_content)
+        raw.read = src.read
+
+        if url == web_url:
+            raise UnauthorizedException()
+        else:
+            res = FakeResponse(200, {})
+        res.raw = raw
+        res.headers = {'Content-Length': str(len(file_content))}
+        return res
+
+    with patch.object(File, "_get", side_effect=fake_get) as mock_get:
+        f = File({})
+        f._download_url = web_url
+        f._upload_url = api_url
+        f.write_to(fp)
+
+    fp.seek(0)
+    assert file_content == fp.read()
+    expected = call('http://example.com/download_url/', stream=True)
+    assert expected in mock_get.mock_calls
+
+
 def test_remove_file_failed():
     f = File({})
     f.path = 'some/path'
@@ -190,3 +224,80 @@ def test_remove_file_failed():
     assert f._delete.called
 
     assert 'Could not delete' in e.value.args[0]
+
+
+def test_move_file_to_dir():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder)
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/'})
+
+
+def test_move_file_to_specified_dir_and_file():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, to_filename='newname')
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'rename': 'newname'})
+
+
+def test_move_file_to_specified_file():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, to_filename='newname')
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'rename': 'newname'})
+
+
+def test_force_move_file():
+    f = File({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, force=True)
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'conflict': 'replace'})
+
+
+def test_move_file_failed():
+    f = File({})
+    f.path = 'some/path'
+    f._move_url = 'http://move.me/uri'
+    # TODO
+    f._post = MagicMock(return_value=FakeResponse(204, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    with pytest.raises(RuntimeError) as e:
+        f.move_to('osfclient', folder)
+
+    assert f._post.called
+
+    assert 'Could not move' in e.value.args[0]

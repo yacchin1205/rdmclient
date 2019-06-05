@@ -1,7 +1,7 @@
 from tqdm import tqdm
 
 from .core import OSFCore
-from ..exceptions import FolderExistsException
+from ..exceptions import FolderExistsException, UnauthorizedException
 
 
 def copyfileobj(fsrc, fdst, total, length=16*1024):
@@ -29,6 +29,7 @@ class File(OSFCore):
         self._download_url = self._get_attribute(file, 'links', 'download')
         self._upload_url = self._get_attribute(file, 'links', 'upload')
         self._delete_url = self._get_attribute(file, 'links', 'delete')
+        self._move_url = self._get_attribute(file, 'links', 'move')
         self.osf_path = self._get_attribute(file, 'attributes', 'path')
         self.path = self._get_attribute(file,
                                         'attributes', 'materialized_path')
@@ -37,6 +38,7 @@ class File(OSFCore):
                                                 'attributes', 'date_created')
         self.date_modified = self._get_attribute(file,
                                                  'attributes', 'date_modified')
+        self.size = self._get_attribute(file, 'attributes', 'size')
         self.hashes = self._get_attribute(file,
                                           'attributes', 'extra', 'hashes')
 
@@ -52,7 +54,10 @@ class File(OSFCore):
         if 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
-        response = self._get(self._download_url, stream=True)
+        try:
+            response = self._get(self._download_url, stream=True)
+        except UnauthorizedException:
+            response = self._get(self._upload_url, stream=True)
         if response.status_code == 200:
             response.raw.decode_content = True
             copyfileobj(response.raw, fp,
@@ -90,6 +95,23 @@ class File(OSFCore):
             msg = ('Could not update {} (status '
                    'code: {}).'.format(self.path, response.status_code))
             raise RuntimeError(msg)
+
+    def move_to(self, storage, to_folder, to_filename=None, force=False):
+        """Move this file to the remote storage."""
+        try:
+            path = to_folder.osf_path
+        except AttributeError:
+            path = to_folder.path
+        body = {'action': 'move', 'path': path}
+        if to_filename is not None:
+            body['rename'] = to_filename
+        if force:
+            body['conflict'] = 'replace'
+        response = self._post(self._move_url, json=body)
+        if response.status_code != 200 and response.status_code != 201:
+            raise RuntimeError('Could not move {} (status '
+                               'code: {}).'.format(self.path,
+                                                   response.status_code))
 
 
 class ContainerMixin:
@@ -201,9 +223,3 @@ class _WaterButlerFolder(OSFCore, ContainerMixin):
         self._new_folder_url = self._get_attribute(file, 'links', 'new_folder')
         self._new_file_url = self._get_attribute(file, 'links', 'upload')
         self._move_url = self._get_attribute(file, 'links', 'move')
-
-    @property
-    def full_folder(self):
-        base_url = "https://api.osf.io/v2/files"
-        folder = self._json(self._get(base_url % self.osf_path), 200)
-        return Folder(folder, self.session)

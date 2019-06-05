@@ -25,6 +25,9 @@ class OSFCore(object):
     def _put(self, url, *args, **kwargs):
         return self.session.put(url, *args, **kwargs)
 
+    def _post(self, url, *args, **kwargs):
+        return self.session.post(url, *args, **kwargs)
+
     def _delete(self, url, *args, **kwargs):
         return self.session.delete(url, *args, **kwargs)
 

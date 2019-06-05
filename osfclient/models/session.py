@@ -22,10 +22,16 @@ class OSFSession(requests.Session):
             })
         self.base_url = 'https://api.osf.io/v2/'
 
+    def set_endpoint(self, base_url):
+        self.base_url = base_url
+
     def basic_auth(self, username, password):
         self.auth = (username, password)
         if 'Authorization' in self.headers:
             self.headers.pop('Authorization')
+
+    def token_auth(self, token):
+        self.headers['Authorization'] = 'Bearer ' + token
 
     def build_url(self, *args):
         parts = [self.base_url]

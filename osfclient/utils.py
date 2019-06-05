@@ -22,16 +22,22 @@ def norm_remote_path(path):
         return path
 
 
-def split_storage(path, default='osfstorage'):
+def split_storage(path, default='osfstorage', normalize=True):
     """Extract storage name from file path.
 
     If a path begins with a known storage provider the name is removed
     from the path. Otherwise the `default` storage provider is returned
     and the path is not modified.
     """
-    path = norm_remote_path(path)
+    if normalize:
+        path = norm_remote_path(path)
+    env_known_providers = os.getenv('KNOWN_PROVIDERS')
+    if env_known_providers is not None:
+        known_providers = env_known_providers.split(',')
+    else:
+        known_providers = KNOWN_PROVIDERS
 
-    for provider in KNOWN_PROVIDERS:
+    for provider in known_providers:
         if path.startswith(provider + '/'):
             if six.PY3:
                 return path.split('/', maxsplit=1)
@@ -66,7 +72,7 @@ def file_empty(fp):
 
 def checksum(file_path, hash_type='md5', block_size=65536):
     """Returns either the md5 or sha256 hash of a file at `file_path`.
-    
+
     md5 is the default hash_type as it is faster than sha256
 
     The default block size is 64 kb, which appears to be one of a few command
@@ -93,4 +99,4 @@ def get_local_file_size(fp):
     """Get file size from file pointer"""
     # one-liner to get file size from file pointer explained at
     # https://stackoverflow.com/a/283719/2680824
-    return os.fstat(fp.fileno()).st_size 
+    return os.fstat(fp.fileno()).st_size

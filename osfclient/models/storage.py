@@ -82,7 +82,7 @@ class Storage(OSFCore, ContainerMixin):
         # When uploading a large file (>a few MB) that already exists
         # we sometimes get a ConnectionError instead of a status == 409.
         connection_error = False
-        
+
         # peek at the file to check if it is an empty file which needs special
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF.
