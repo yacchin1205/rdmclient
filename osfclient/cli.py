@@ -228,9 +228,21 @@ def fetch(args):
 
     osf = _setup_osf(args)
     project = osf.project(args.project)
+    if args.base_path is not None:
+        base_path = args.base_path
+        if base_path.startswith('/'):
+            base_path = base_path[1:]
+        base_file_path = base_path[base_path.index('/'):]
+        if not base_file_path.endswith('/'):
+            base_file_path = base_file_path + '/'
+        path_filter = lambda f: is_path_matched(base_file_path, f)
+    else:
+        path_filter = None
 
     store = project.storage(storage)
-    for file_ in store.files:
+    files = store.files if path_filter is None \
+            else store.matched_files(path_filter)
+    for file_ in files:
         if norm_remote_path(file_.path) == remote_path:
             if local_path_exists and not args.force and args.update:
                 if file_.hashes.get('md5') == checksum(local_path):
