@@ -100,3 +100,31 @@ def get_local_file_size(fp):
     # one-liner to get file size from file pointer explained at
     # https://stackoverflow.com/a/283719/2680824
     return os.fstat(fp.fileno()).st_size
+
+
+def is_path_matched(target_file_path, fileobj):
+    file_path = fileobj['attributes']['materialized_path']
+    if target_file_path is None:
+        return True
+    file_path_segs = file_path.split('/')
+    target_file_path_segs = target_file_path.split('/')
+    if file_path_segs[-1] == '':
+        file_path_segs = file_path_segs[:-1]
+    if target_file_path_segs[-1] == '':
+        target_file_path_segs = target_file_path_segs[:-1]
+    for target_file_path_seg, file_path_seg in zip(target_file_path_segs,
+                                                   file_path_segs):
+        if target_file_path_seg.startswith('%') and \
+           target_file_path_seg.endswith('%'):
+            if target_file_path_seg[1:-1] not in file_path_seg:
+                return False
+        elif target_file_path_seg.startswith('%'):
+            if not file_path_seg.endswith(target_file_path_seg[1:]):
+                return False
+        elif target_file_path_seg.endswith('%'):
+            if not file_path_seg.startswith(target_file_path_seg[:-1]):
+                return False
+        else:
+            if file_path_seg != target_file_path_seg:
+                return False
+    return True

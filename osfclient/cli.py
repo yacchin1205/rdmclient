@@ -18,7 +18,7 @@ from tzlocal import get_localzone
 
 from .api import OSF
 from .exceptions import UnauthorizedException
-from .utils import norm_remote_path, split_storage, makedirs, checksum
+from .utils import norm_remote_path, split_storage, makedirs, checksum, is_path_matched
 
 
 def config_from_file():
@@ -252,10 +252,26 @@ def list_(args):
     osf = _setup_osf(args)
 
     project = osf.project(args.project)
+    if args.base_path is not None:
+        base_path = args.base_path
+        if base_path.startswith('/'):
+            base_path = base_path[1:]
+        base_file_path = base_path[base_path.index('/'):]
+        if not base_file_path.endswith('/'):
+            base_file_path = base_file_path + '/'
+        base_provider = base_path.split('/')[0]
+        path_filter = lambda f: is_path_matched(base_file_path, f)
+    else:
+        base_provider = None
+        path_filter = None
 
     for store in project.storages:
         prefix = store.name
-        for file_ in store.files:
+        if base_provider is not None and base_provider != prefix:
+            continue
+        files = store.files if path_filter is None \
+                else store.matched_files(path_filter)
+        for file_ in files:
             path = file_.path
             if path.startswith('/'):
                 path = path[1:]
