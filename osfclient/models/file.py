@@ -115,7 +115,8 @@ class File(OSFCore):
 
 
 class ContainerMixin:
-    def _iter_children(self, url, kind, klass, recurse=None):
+    def _iter_children(self, url, kind, klass, recurse=None,
+                       target_filter=None):
         """Iterate over all children of `kind`
 
         Yield an instance of `klass` when a child is of type `kind`. Uses
@@ -126,6 +127,8 @@ class ContainerMixin:
 
         while children:
             child = children.pop()
+            if target_filter is not None and not target_filter(child):
+                continue
             kind_ = child['attributes']['kind']
             if kind_ == kind:
                 yield klass(child, self.session)
