@@ -431,6 +431,12 @@ def move(args):
         if norm_remote_path(f.path) == remote_path:
             f.move_to(target_storage, target_folder,
                       to_filename=target_filename, force=args.force)
+            return
+    for f in store.folders:
+        if norm_remote_path(f.path) == remote_path:
+            f.move_to(target_storage, target_folder,
+                      to_foldername=target_filename, force=args.force)
+            return
 
 
 def _ensure_folder(store, path):

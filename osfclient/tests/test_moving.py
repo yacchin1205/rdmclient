@@ -153,6 +153,132 @@ def test_move_file_to_file_on_root(OSF_project):
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_move_folder_to_dir(OSF_project):
+    args = MockArgs(project='1234', username='joe', source='osfstorage/a/a',
+                    target='osfstorage/c/')
+
+    def simple_getenv(key):
+        if key == 'OSF_PASSWORD':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+        move(args)
+
+    OSF_project.assert_called_once_with('1234')
+
+    MockProject = OSF_project.return_value
+    MockStorage = MockProject._storage_mock.return_value
+    for f in MockStorage.folders:
+        mock_calls = list(f.mock_calls)
+        if f._path_mock.return_value == '/a/a':
+            assert call.move_to('osfstorage',
+                                [f for f in MockStorage.folders
+                                 if f.path == '/c'][0],
+                                to_foldername=None,
+                                force=False) in mock_calls
+
+
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_move_folder_to_sub_dir(OSF_project):
+    args = MockArgs(project='1234', username='joe', source='osfstorage/a/a',
+                    target='osfstorage/c/c/')
+
+    def simple_getenv(key):
+        if key == 'OSF_PASSWORD':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+        move(args)
+
+    OSF_project.assert_called_once_with('1234')
+
+    MockProject = OSF_project.return_value
+    MockStorage = MockProject._storage_mock.return_value
+    for f in MockStorage.folders:
+        mock_calls = list(f.mock_calls)
+        if f._path_mock.return_value == '/a/a':
+            assert call.move_to('osfstorage',
+                                [f for f in MockStorage.folders
+                                 if f.path == '/c/c'][0],
+                                to_foldername=None,
+                                force=False) in mock_calls
+
+
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_move_folder_to_newfolder(OSF_project):
+    args = MockArgs(project='1234', username='joe', source='osfstorage/a/a',
+                    target='osfstorage/c/newfolder')
+
+    def simple_getenv(key):
+        if key == 'OSF_PASSWORD':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+        move(args)
+
+    OSF_project.assert_called_once_with('1234')
+
+    MockProject = OSF_project.return_value
+    MockStorage = MockProject._storage_mock.return_value
+    for f in MockStorage.folders:
+        mock_calls = list(f.mock_calls)
+        if f._path_mock.return_value == '/a/a':
+            assert call.move_to('osfstorage',
+                                [f for f in MockStorage.folders
+                                 if f.path == '/c'][0],
+                                to_foldername='newfolder',
+                                force=False) in mock_calls
+
+
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_move_folder_to_root(OSF_project):
+    args = MockArgs(project='1234', username='joe', source='osfstorage/a/a',
+                    target='osfstorage/')
+
+    def simple_getenv(key):
+        if key == 'OSF_PASSWORD':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+        move(args)
+
+    OSF_project.assert_called_once_with('1234')
+
+    MockProject = OSF_project.return_value
+    MockStorage = MockProject._storage_mock.return_value
+    for f in MockStorage.folders:
+        if f._path_mock.return_value == '/a/a':
+            assert call.move_to('osfstorage',
+                                MockStorage,
+                                to_foldername=None,
+                                force=False) in f.mock_calls
+
+
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_move_folder_to_folder_on_root(OSF_project):
+    args = MockArgs(project='1234', username='joe', source='osfstorage/a/a',
+                    target='osfstorage/newfolder')
+
+    def simple_getenv(key):
+        if key == 'OSF_PASSWORD':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+        move(args)
+
+    OSF_project.assert_called_once_with('1234')
+
+    MockProject = OSF_project.return_value
+    MockStorage = MockProject._storage_mock.return_value
+    for f in MockStorage.folders:
+        if f._path_mock.return_value == '/a/a':
+            assert call.move_to('osfstorage',
+                                MockStorage,
+                                to_foldername='newfolder',
+                                force=False) in f.mock_calls
+
+
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
 def test_wrong_storage_name(OSF_project):
     args = MockArgs(project='1234', username='joe',
                     source='DOESNTEXIST/a/a/a', target='osfstorage/c/')
