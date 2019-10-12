@@ -360,6 +360,40 @@ def upload(args):
 
 
 @might_need_auth
+def makefolder(args):
+    """Create a new folder in an existing project.
+
+    The first part of the remote path is interpreted as the name of the
+    storage provider. If there is no match the default (osfstorage) is
+    used.
+    """
+    osf = _setup_osf(args)
+    if not osf.has_auth:
+        sys.exit('To create a folder you need to provide a username and'
+                 ' password or token.')
+
+    project = osf.project(args.project)
+
+    storage, remote_path = split_storage(args.target)
+
+    store = project.storage(storage)
+    folders = []
+    for f in store.folders:
+        if remote_path.startswith(norm_remote_path(f.path) + os.path.sep):
+            folders.append(f)
+    if len(folders) == 0:
+        parent = store
+        parent_path_segments = []
+    else:
+        folders = sorted(folders, key=lambda f: len(norm_remote_path(f.path)))
+        parent = folders[-1]
+        parent_path_segments = norm_remote_path(parent.path).split(os.path.sep)
+    remote_path_segments = remote_path.split(os.path.sep)
+    for foldername in remote_path_segments[len(parent_path_segments):]:
+        parent = parent.create_folder(foldername)
+
+
+@might_need_auth
 def remove(args):
     """Remove a file from the project's storage.
 

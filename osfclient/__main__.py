@@ -4,7 +4,7 @@ import six
 import argparse
 from textwrap import dedent
 
-from .cli import clone, fetch, list_, remove, move, upload, init
+from .cli import clone, fetch, list_, makefolder, remove, move, upload, init
 from . import __version__
 
 
@@ -15,13 +15,14 @@ def main():
 
     These are common osf commands:
 
-        init      Set up a .osfcli.config file
-        clone     Copy all files from all storages of a project
-        fetch     Fetch an individual file from a project
-        list      List all files from all storages for a project
-        upload    Upload a new file to an existing project
-        remove    Remove a file from a project's storage
-        move      Move a file to specified location on the project's storage.
+        init       Set up a .osfcli.config file
+        clone      Copy all files from all storages of a project
+        fetch      Fetch an individual file from a project
+        list       List all files from all storages for a project
+        upload     Upload a new file to an existing project
+        makefolder Create a new folder
+        remove     Remove a file from a project's storage
+        move       Move a file to specified location on the project's storage.
 
     See 'osf <command> -h' to read about a specific command.
     """)
@@ -101,6 +102,11 @@ def main():
                                action='store_true')
     upload_parser.add_argument('source', help='Local file')
     upload_parser.add_argument('destination', help='Remote file path')
+
+    # Create a folder
+    makefolder_parser = _add_subparser('makefolder', makefolder.__doc__, aliases=['mkdir'])
+    makefolder_parser.set_defaults(func=makefolder)
+    makefolder_parser.add_argument('target', help='Remote file path')
 
     # Remove a single file
     remove_parser = _add_subparser('remove', remove.__doc__, aliases=['rm'])
