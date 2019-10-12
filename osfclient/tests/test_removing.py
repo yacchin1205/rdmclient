@@ -44,6 +44,8 @@ def test_remove_file(OSF_project):
     for f in MockStorage.files:
         if f._path_mock.return_value == '/a/a/a':
             assert call.remove() in f.mock_calls
+    for f in MockStorage.folders:
+        assert call.remove() not in f.mock_calls
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
@@ -65,6 +67,8 @@ def test_wrong_storage_name(OSF_project):
     for f in MockStorage.files:
         if f._path_mock.return_value == '/a/a/a':
             assert call.remove() not in f.mock_calls
+    for f in MockStorage.folders:
+        assert call.remove() not in f.mock_calls
 
 
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
@@ -87,3 +91,54 @@ def test_non_existant_file(OSF_project):
     for f in MockStorage.files:
         assert f._path_mock.called
         assert call.remove() not in f.mock_calls
+    for f in MockStorage.folders:
+        assert f._path_mock.called
+        assert call.remove() not in f.mock_calls
+
+
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_remove_folder(OSF_project):
+    args = MockArgs(project='1234', username='joe', target='osfstorage/a/a')
+
+    def simple_getenv(key):
+        if key == 'OSF_PASSWORD':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+        remove(args)
+
+    OSF_project.assert_called_once_with('1234')
+
+    MockProject = OSF_project.return_value
+    MockStorage = MockProject._storage_mock.return_value
+    for f in MockStorage.files:
+        assert call.remove() not in f.mock_calls
+    for f in MockStorage.folders:
+        if f._path_mock.return_value == '/a/a':
+            assert call.remove() in f.mock_calls
+        else:
+            assert call.remove() not in f.mock_calls
+
+
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_remove_folder_with_slash(OSF_project):
+    args = MockArgs(project='1234', username='joe', target='osfstorage/a/a/')
+
+    def simple_getenv(key):
+        if key == 'OSF_PASSWORD':
+            return 'secret'
+
+    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+        remove(args)
+
+    OSF_project.assert_called_once_with('1234')
+
+    MockProject = OSF_project.return_value
+    MockStorage = MockProject._storage_mock.return_value
+    for f in MockStorage.files:
+        assert call.remove() not in f.mock_calls
+    for f in MockStorage.folders:
+        if f._path_mock.return_value == '/a/a':
+            assert call.remove() in f.mock_calls
+        else:
+            assert call.remove() not in f.mock_calls

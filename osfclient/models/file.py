@@ -202,6 +202,12 @@ class Folder(OSFCore, ContainerMixin):
     def __str__(self):
         return '<Folder [{0}, {1}]>'.format(self.id, self.path)
 
+    def remove(self):
+        """Remove this folder from the remote storage."""
+        response = self._delete(self._delete_url)
+        if response.status_code != 204:
+            raise RuntimeError('Could not delete {}.'.format(self.path))
+
 
 class _WaterButlerFolder(OSFCore, ContainerMixin):
     """A slimmed down `Folder` built from a WaterButler response

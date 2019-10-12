@@ -380,6 +380,11 @@ def remove(args):
     for f in store.files:
         if norm_remote_path(f.path) == remote_path:
             f.remove()
+            return
+    for f in store.folders:
+        if norm_remote_path(f.path) == remote_path:
+            f.remove()
+            return
 
 
 @might_need_auth
