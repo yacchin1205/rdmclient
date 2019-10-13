@@ -442,7 +442,7 @@ def move(args):
         target_folder_path = target_path[:-1]
         target_filename = None
     elif '/' in target_path:
-        sep = target_path.index('/')
+        sep = target_path.rindex('/')
         target_folder_path = target_path[:sep]
         target_filename = target_path[sep + 1:]
     elif target_path == '':
