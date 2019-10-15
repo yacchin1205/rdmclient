@@ -141,6 +141,107 @@ def test_create_new_folder():
                                         params={'name': 'foobar'})
 
 
+def test_remove_folder():
+    folder = Folder({})
+    folder._delete_url = 'http://delete.me/uri'
+    folder._delete = MagicMock(return_value=FakeResponse(204, {'data': {}}))
+
+    folder.remove()
+
+    assert folder._delete.called
+
+
+def test_remove_folder_failed():
+    folder = Folder({})
+    folder.path = 'some/path'
+    folder._delete_url = 'http://delete.me/uri'
+    folder._delete = MagicMock(return_value=FakeResponse(404, {'data': {}}))
+
+    with pytest.raises(RuntimeError) as e:
+        folder.remove()
+
+    assert folder._delete.called
+
+    assert 'Could not delete' in e.value.args[0]
+
+
+def test_move_folder_to_dir():
+    f = Folder({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder)
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/'})
+
+
+def test_move_folder_to_specified_dir_and_name():
+    f = Folder({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, to_foldername='newname')
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'rename': 'newname'})
+
+
+def test_move_folder_to_specified_name():
+    f = Folder({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, to_foldername='newname')
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'rename': 'newname'})
+
+
+def test_force_move_folder():
+    f = Folder({})
+    f._move_url = 'http://move.me/uri'
+    f._post = MagicMock(return_value=FakeResponse(201, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    f.move_to('osfclient', folder, force=True)
+
+    f._post.assert_called_once_with('http://move.me/uri',
+                                    json={'action': 'move', 'path': 'sample/',
+                                          'conflict': 'replace'})
+
+
+def test_move_folder_failed():
+    f = Folder({})
+    f.path = 'some/path'
+    f._move_url = 'http://move.me/uri'
+    # TODO
+    f._post = MagicMock(return_value=FakeResponse(204, {'data': {}}))
+
+    folder = Folder({})
+    folder.path = 'sample/'
+
+    with pytest.raises(RuntimeError) as e:
+        f.move_to('osfclient', folder)
+
+    assert f._post.called
+
+    assert 'Could not move' in e.value.args[0]
+
+
 def test_remove_file():
     f = File({})
     f._delete_url = 'http://delete.me/uri'
