@@ -1,4 +1,5 @@
 from mock import MagicMock, PropertyMock
+from ..utils import norm_remote_path, is_path_matched
 
 
 # When using a PropertyMock store it as an attribute
@@ -28,6 +29,13 @@ def MockFolder(name):
 
 
 def MockStorage(name):
+    def make_matched_files(mock):
+        def make_raw_file(file):
+            return {'attributes': {'materialized_path': '/' + norm_remote_path(file._path_mock.return_value)}}
+        def matched_files(target_filter):
+            return [f for f in mock.files if target_filter(make_raw_file(f))]
+        return matched_files
+
     mock = MagicMock(name='Storage-%s' % name,
                      files=[MockFile('/a/a/a'), MockFile('b/b/b')],
                      folders=[MockFolder('/a'), MockFolder('/a/a'),
@@ -35,6 +43,9 @@ def MockStorage(name):
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
+    matched_files = MagicMock(side_effect=make_matched_files(mock))
+    type(mock).matched_files = matched_files
+    mock._matched_files_mock = matched_files
     return mock
 
 

@@ -241,3 +241,79 @@ def test_fetch_local_file_exists_force_overrides_update(OSF_project, os_makedirs
     # file should be created even though local matches remote and update is
     # True, because force overrides update
     assert mock.call('a', 'wb') in mock_open_func.mock_calls
+
+
+@patch('osfclient.cli.makedirs')
+@patch('osfclient.cli.os.path.exists', return_value=False)
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_fetch_last_file(OSF_project, os_path_exists, os_makedirs):
+    # check that `osf fetch` opens the right files with the right name and mode
+    args = MockArgs(project='1234', remote='osfstorage/b/b/b')
+
+    mock_open_func = mock_open()
+
+    with patch('osfclient.cli.open', mock_open_func):
+        fetch(args)
+
+    OSF_project.assert_called_once_with('1234')
+    # check that the project and the files have been accessed
+    store = OSF_project.return_value._storage_mock.return_value
+    assert store._name_mock.return_value == 'osfstorage'
+
+    # should create a file in the same directory when no local
+    # filename is specified
+    assert mock.call('b', 'wb') in mock_open_func.mock_calls
+    for f in store.files:
+        assert f._path_mock.called
+
+
+@patch('osfclient.cli.makedirs')
+@patch('osfclient.cli.os.path.exists', return_value=False)
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedirs):
+    # check that `osf fetch` opens the right files with the right name and mode
+    args = MockArgs(project='1234', remote='osfstorage/b/b/b',
+                    base_path='osfstorage/b/b/')
+
+    mock_open_func = mock_open()
+
+    with patch('osfclient.cli.open', mock_open_func):
+        fetch(args)
+
+    OSF_project.assert_called_once_with('1234')
+    # check that the project and the files have been accessed
+    store = OSF_project.return_value._storage_mock.return_value
+    assert store._name_mock.return_value == 'osfstorage'
+
+    # should create a file in the same directory when no local
+    # filename is specified
+    assert mock.call('b', 'wb') in mock_open_func.mock_calls
+    for f in store.files[:-1]:
+        assert not f._path_mock.called
+    for f in store.files[-1:]:
+        assert f._path_mock.called
+
+
+@patch('osfclient.cli.makedirs')
+@patch('osfclient.cli.os.path.exists', return_value=False)
+@patch.object(OSF, 'project', return_value=MockProject('1234'))
+def test_fetch_file_with_invalid_base_path(OSF_project, os_path_exists, os_makedirs):
+    # check that `osf fetch` opens the right files with the right name and mode
+    args = MockArgs(project='1234', remote='osfstorage/b/b/b',
+                    base_path='osfstorage/a/')
+
+    mock_open_func = mock_open()
+
+    with patch('osfclient.cli.open', mock_open_func):
+        fetch(args)
+
+    OSF_project.assert_called_once_with('1234')
+    # check that the project and the files have been accessed
+    store = OSF_project.return_value.storages[0]
+    assert store._name_mock.return_value == 'osfstorage'
+
+    # should create a file in the same directory when no local
+    # filename is specified
+    assert mock.call('b', 'wb') not in mock_open_func.mock_calls
+    for f in store.files:
+        assert not f._path_mock.called

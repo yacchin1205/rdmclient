@@ -188,6 +188,42 @@ def test_sublist_empty(capsys):
     assert captured.out.split('\n') == ['']
 
 
+def test_sublist_exists(capsys):
+    args = MockArgs(project='f3szh', base_path='/osfstorage/folder2')
+
+    njson = fake_responses._build_node('nodes')
+    rjson = fake_responses.files_node('f3szh', 'osfstorage',
+                                      file_names=['hello.txt', 'bye.txt'],
+                                      folder_names=['folder1', 'folder2'])
+    fjson1 = fake_responses.files_node('f3szh', 'osfstorage',
+                                       file_names=['folder1/folder1content.txt'])
+    fjson2 = fake_responses.files_node('f3szh', 'osfstorage',
+                                       file_names=['folder2/folder2content.txt'])
+    sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
+
+    def simple_OSFCore_get(url):
+        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+            return FakeResponse(200, njson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+            return FakeResponse(200, sjson)
+        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+            return FakeResponse(200, rjson)
+        elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/folder2123/':
+            return FakeResponse(200, fjson2)
+        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+            return FakeResponse(200, {'data': {'type': 'nodes'}})
+        else:
+            print(url)
+            raise ValueError()
+
+    with patch.object(OSFCore, '_get',
+                      side_effect=simple_OSFCore_get) as mock_osf_get:
+        list_(args)
+    captured = capsys.readouterr()
+    assert captured.err == ''
+    assert captured.out.split('\n') == ['osfstorage/folder2/folder2content.txt', '']
+
+
 def test_long_format_list(capsys):
     args = MockArgs(project='f3szh', long_format=True)
 
