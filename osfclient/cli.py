@@ -18,7 +18,7 @@ from tzlocal import get_localzone
 
 from .api import OSF
 from .exceptions import UnauthorizedException
-from .utils import norm_remote_path, split_storage, makedirs, checksum
+from .utils import norm_remote_path, split_storage, makedirs, checksum, is_path_matched
 
 
 def config_from_file():
@@ -228,9 +228,21 @@ def fetch(args):
 
     osf = _setup_osf(args)
     project = osf.project(args.project)
+    if args.base_path is not None:
+        base_path = args.base_path
+        if base_path.startswith('/'):
+            base_path = base_path[1:]
+        base_file_path = base_path[base_path.index('/'):]
+        if not base_file_path.endswith('/'):
+            base_file_path = base_file_path + '/'
+        path_filter = lambda f: is_path_matched(base_file_path, f)
+    else:
+        path_filter = None
 
     store = project.storage(storage)
-    for file_ in store.files:
+    files = store.files if path_filter is None \
+            else store.matched_files(path_filter)
+    for file_ in files:
         if norm_remote_path(file_.path) == remote_path:
             if local_path_exists and not args.force and args.update:
                 if file_.hashes.get('md5') == checksum(local_path):
@@ -252,10 +264,26 @@ def list_(args):
     osf = _setup_osf(args)
 
     project = osf.project(args.project)
+    if args.base_path is not None:
+        base_path = args.base_path
+        if base_path.startswith('/'):
+            base_path = base_path[1:]
+        base_file_path = base_path[base_path.index('/'):]
+        if not base_file_path.endswith('/'):
+            base_file_path = base_file_path + '/'
+        base_provider = base_path.split('/')[0]
+        path_filter = lambda f: is_path_matched(base_file_path, f)
+    else:
+        base_provider = None
+        path_filter = None
 
     for store in project.storages:
         prefix = store.name
-        for file_ in store.files:
+        if base_provider is not None and base_provider != prefix:
+            continue
+        files = store.files if path_filter is None \
+                else store.matched_files(path_filter)
+        for file_ in files:
             path = file_.path
             if path.startswith('/'):
                 path = path[1:]
@@ -332,6 +360,40 @@ def upload(args):
 
 
 @might_need_auth
+def makefolder(args):
+    """Create a new folder in an existing project.
+
+    The first part of the remote path is interpreted as the name of the
+    storage provider. If there is no match the default (osfstorage) is
+    used.
+    """
+    osf = _setup_osf(args)
+    if not osf.has_auth:
+        sys.exit('To create a folder you need to provide a username and'
+                 ' password or token.')
+
+    project = osf.project(args.project)
+
+    storage, remote_path = split_storage(args.target)
+
+    store = project.storage(storage)
+    folders = []
+    for f in store.folders:
+        if remote_path.startswith(norm_remote_path(f.path) + os.path.sep):
+            folders.append(f)
+    if len(folders) == 0:
+        parent = store
+        parent_path_segments = []
+    else:
+        folders = sorted(folders, key=lambda f: len(norm_remote_path(f.path)))
+        parent = folders[-1]
+        parent_path_segments = norm_remote_path(parent.path).split(os.path.sep)
+    remote_path_segments = remote_path.split(os.path.sep)
+    for foldername in remote_path_segments[len(parent_path_segments):]:
+        parent = parent.create_folder(foldername)
+
+
+@might_need_auth
 def remove(args):
     """Remove a file from the project's storage.
 
@@ -352,6 +414,11 @@ def remove(args):
     for f in store.files:
         if norm_remote_path(f.path) == remote_path:
             f.remove()
+            return
+    for f in store.folders:
+        if norm_remote_path(f.path) == remote_path:
+            f.remove()
+            return
 
 
 @might_need_auth
@@ -375,7 +442,7 @@ def move(args):
         target_folder_path = target_path[:-1]
         target_filename = None
     elif '/' in target_path:
-        sep = target_path.index('/')
+        sep = target_path.rindex('/')
         target_folder_path = target_path[:sep]
         target_filename = target_path[sep + 1:]
     elif target_path == '':
@@ -398,6 +465,12 @@ def move(args):
         if norm_remote_path(f.path) == remote_path:
             f.move_to(target_storage, target_folder,
                       to_filename=target_filename, force=args.force)
+            return
+    for f in store.folders:
+        if norm_remote_path(f.path) == remote_path:
+            f.move_to(target_storage, target_folder,
+                      to_foldername=target_filename, force=args.force)
+            return
 
 
 def _ensure_folder(store, path):

@@ -6,6 +6,7 @@ from requests.exceptions import ConnectionError
 from .core import OSFCore
 from .file import ContainerMixin
 from .file import File
+from .file import Folder
 from ..utils import checksum
 from ..utils import file_empty
 from ..utils import get_local_file_size
@@ -51,6 +52,23 @@ class Storage(OSFCore, ContainerMixin):
         """
         return self._iter_children(self._files_url, 'file', File,
                                    self._files_key)
+
+    @property
+    def folders(self):
+        """Iterate over all folders in this storage.
+
+        Recursively lists all folders in all subfolders.
+        """
+        return self._iter_children(self._files_url, 'folder', Folder,
+                                   self._files_key)
+
+    def matched_files(self, target_filter):
+        """Iterate all matched files in this storage.
+
+        Recursively lists files in all subfolders.
+        """
+        return self._iter_children(self._files_url, 'file', File,
+                                   self._files_key, target_filter)
 
     def create_file(self, path, fp, force=False, update=False):
         """Store a new file at `path` in this storage.

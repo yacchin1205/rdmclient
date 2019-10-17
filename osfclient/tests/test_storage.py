@@ -41,21 +41,39 @@ def test_iterate_folders(OSFCore_get):
     store = Storage({})
     store._files_url = 'https://api.osf.io/v2//nodes/f3szh/files/osfstorage'
 
-    json = fake_responses.files_node('f3szh', 'osfstorage',
-                                     folder_names=['foo', 'bar'])
-    response = FakeResponse(200, json)
-    OSFCore_get.return_value = response
+    called = []
+    def mocked_osfcore_get(url):
+        called.append(url)
+        if url == store._files_url:
+            json = fake_responses.files_node('f3szh', 'osfstorage',
+                                             folder_names=['foo', 'bar'])
+            return FakeResponse(200, json)
+        elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/bar123/':
+            json = fake_responses.files_node('f3szh', 'osfstorage',
+                                             file_names=['bar.txt'])
+            return FakeResponse(200, json)
+        elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/foo123/':
+            json = fake_responses.files_node('f3szh', 'osfstorage',
+                                             file_names=['foo.txt'],
+                                             folder_names=['childfoo'])
+            return FakeResponse(200, json)
+        elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/childfoo123/':
+            json = fake_responses.files_node('f3szh', 'osfstorage',
+                                             file_names=['childfoo.txt'])
+            return FakeResponse(200, json)
+        else:
+            raise ValueError(url)
+    OSFCore_get.side_effect = mocked_osfcore_get
 
     folders = list(store.folders)
 
-    assert len(folders) == 2
+    assert len(folders) == 3
     for folder in folders:
         assert isinstance(folder, Folder)
         assert folder.session == store.session
-        assert folder.name in ('foo', 'bar')
+        assert folder.name in ('foo', 'bar', 'childfoo')
 
-    OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//nodes/f3szh/files/osfstorage')
+    assert len(set(called)) == 4
 
 
 def test_iterate_files_and_folders():
@@ -233,7 +251,7 @@ def test_update_existing_file_files_match():
 
     def simple_checksum(file_path):
         return '0' * 32
-    
+
     fake_fp = MagicMock()
     fake_fp.mode = 'rb'
     with patch.object(OSFCore, '_put',
@@ -280,7 +298,7 @@ def test_update_existing_file_files_match_force_overrides_update():
 
     def simple_checksum(file_path):
         return '0' * 32
-    
+
     fake_fp = MagicMock()
     fake_fp.mode = 'rb'
     with patch.object(OSFCore, '_put',
@@ -492,7 +510,7 @@ def test_update_existing_file_overrides_connection_error():
 
     def simple_checksum(file_path):
         return '0' * 32
-    
+
     store._files_url = 'https://api.osf.io/v2//nodes/f3szh/files/osfstorage'
     json = fake_responses.files_node('f3szh', 'osfstorage',
                                      file_names=['hello.txt', 'foo.txt'])
