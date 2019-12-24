@@ -115,7 +115,8 @@ class File(OSFCore):
 
 
 class ContainerMixin:
-    def _iter_children(self, url, kind, klass, recurse=None):
+    def _iter_children(self, url, kind, klass, recurse=None,
+                       target_filter=None):
         """Iterate over all children of `kind`
 
         Yield an instance of `klass` when a child is of type `kind`. Uses
@@ -126,10 +127,12 @@ class ContainerMixin:
 
         while children:
             child = children.pop()
+            if target_filter is not None and not target_filter(child):
+                continue
             kind_ = child['attributes']['kind']
             if kind_ == kind:
                 yield klass(child, self.session)
-            elif recurse is not None:
+            if kind_ != 'file' and recurse is not None:
                 # recurse into a child and add entries to `children`
                 url = self._get_attribute(child, *recurse)
                 children.extend(self._follow_next(url))
@@ -198,6 +201,29 @@ class Folder(OSFCore, ContainerMixin):
 
     def __str__(self):
         return '<Folder [{0}, {1}]>'.format(self.id, self.path)
+
+    def remove(self):
+        """Remove this folder from the remote storage."""
+        response = self._delete(self._delete_url)
+        if response.status_code != 204:
+            raise RuntimeError('Could not delete {}.'.format(self.path))
+
+    def move_to(self, storage, to_folder, to_foldername=None, force=False):
+        """Move this file to the remote storage."""
+        try:
+            path = to_folder.osf_path
+        except AttributeError:
+            path = to_folder.path
+        body = {'action': 'move', 'path': path}
+        if to_foldername is not None:
+            body['rename'] = to_foldername
+        if force:
+            body['conflict'] = 'replace'
+        response = self._post(self._move_url, json=body)
+        if response.status_code != 200 and response.status_code != 201:
+            raise RuntimeError('Could not move {} (status '
+                               'code: {}).'.format(self.path,
+                                                   response.status_code))
 
 
 class _WaterButlerFolder(OSFCore, ContainerMixin):

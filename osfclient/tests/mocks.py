@@ -1,4 +1,5 @@
 from mock import MagicMock, PropertyMock
+from ..utils import norm_remote_path, is_path_matched
 
 
 # When using a PropertyMock store it as an attribute
@@ -28,6 +29,13 @@ def MockFolder(name):
 
 
 def MockStorage(name):
+    def make_matched_files(mock):
+        def make_raw_file(file):
+            return {'attributes': {'materialized_path': '/' + norm_remote_path(file._path_mock.return_value)}}
+        def matched_files(target_filter):
+            return [f for f in mock.files if target_filter(make_raw_file(f))]
+        return matched_files
+
     mock = MagicMock(name='Storage-%s' % name,
                      files=[MockFile('/a/a/a'), MockFile('b/b/b')],
                      folders=[MockFolder('/a'), MockFolder('/a/a'),
@@ -35,6 +43,9 @@ def MockStorage(name):
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
+    matched_files = MagicMock(side_effect=make_matched_files(mock))
+    type(mock).matched_files = matched_files
+    mock._matched_files_mock = matched_files
     return mock
 
 
@@ -52,10 +63,11 @@ def MockProject(name):
 def MockArgs(username=None, password=None, output=None, project=None,
              source=None, destination=None, local=None, remote=None,
              target=None, force=False, update=False, recursive=False,
-             base_url=None, long_format=False):
+             base_url=None, long_format=False, base_path=None):
     args = MagicMock(spec=['username', 'password', 'output', 'project',
                            'source', 'destination', 'target', 'force',
-                           'recursive', 'base_url', 'long_format'])
+                           'recursive', 'base_url', 'long_format',
+                           'base_path'])
     args._username_mock = PropertyMock(return_value=username)
     type(args).username = args._username_mock
     args._password_mock = PropertyMock(return_value=password)
@@ -67,6 +79,8 @@ def MockArgs(username=None, password=None, output=None, project=None,
     type(args).project = args._project_mock
     args._base_url_mock = PropertyMock(return_value=base_url)
     type(args).base_url = args._base_url_mock
+    args._base_path_mock = PropertyMock(return_value=base_path)
+    type(args).base_path = args._base_path_mock
 
     args._source_mock = PropertyMock(return_value=source)
     type(args).source = args._source_mock
