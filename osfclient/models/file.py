@@ -4,18 +4,25 @@ from .core import OSFCore
 from ..exceptions import FolderExistsException, UnauthorizedException
 
 
-def copyfileobj(fsrc, fdst, total, length=16*1024):
+def copyfileobj(fsrc, fdst, total=None, length=16*1024):
     """Copy data from file-like object fsrc to file-like object fdst
 
     This is like shutil.copyfileobj but with a progressbar.
     """
-    with tqdm(unit='bytes', total=total, unit_scale=True) as pbar:
+    if total is not None:
+        with tqdm(unit='bytes', total=total, unit_scale=True) as pbar:
+            while 1:
+                buf = fsrc.read(length)
+                if not buf:
+                    break
+                fdst.write(buf)
+                pbar.update(len(buf))
+    else:
         while 1:
             buf = fsrc.read(length)
             if not buf:
                 break
             fdst.write(buf)
-            pbar.update(len(buf))
 
 
 class File(OSFCore):
@@ -60,9 +67,11 @@ class File(OSFCore):
             response = self._get(self._upload_url, stream=True)
         if response.status_code == 200:
             response.raw.decode_content = True
-            copyfileobj(response.raw, fp,
-                        int(response.headers['Content-Length']))
-
+            if 'Content-Length' in response.headers:
+                copyfileobj(response.raw, fp,
+                            int(response.headers['Content-Length']))
+            else:
+                copyfileobj(response.raw, fp)
         else:
             raise RuntimeError("Response has status "
                                "code {}.".format(response.status_code))
