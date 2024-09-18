@@ -7,10 +7,15 @@ import hashlib
 import os
 import six
 
+
 KNOWN_PROVIDERS = ['osfstorage', 'github', 'figshare', 'googledrive']
 
 
-def norm_remote_path(path):
+async def _async_generator(l):
+    for elem in l:
+        yield elem
+
+def norm_remote_path(path: str) -> str:
     """Normalize `path`.
 
     All remote paths are absolute.
@@ -22,7 +27,7 @@ def norm_remote_path(path):
         return path
 
 
-def split_storage(path, default='osfstorage', normalize=True):
+def split_storage(path: str, default: str='osfstorage', normalize: bool=True):
     """Extract storage name from file path.
 
     If a path begins with a known storage provider the name is removed
@@ -47,7 +52,7 @@ def split_storage(path, default='osfstorage', normalize=True):
     return (default, path)
 
 
-def makedirs(path, mode=511, exist_ok=False):
+def makedirs(path: str, mode=511, exist_ok=False):
     # mode 0777 is 511 in decimal
     if six.PY3:
         return os.makedirs(path, mode, exist_ok)
@@ -102,128 +107,25 @@ def get_local_file_size(fp):
     return os.fstat(fp.fileno()).st_size
 
 
-def _is_path_matched(target_file_path, file_path):
-    if target_file_path is None:
-        return True
-    file_path_segs = file_path.split('/')
-    target_file_path_segs = target_file_path.split('/')
-    if file_path_segs[-1] == '':
-        file_path_segs = file_path_segs[:-1]
-    if target_file_path_segs[-1] == '':
-        target_file_path_segs = target_file_path_segs[:-1]
-    for target_file_path_seg, file_path_seg in zip(target_file_path_segs,
-                                                   file_path_segs):
-        if target_file_path_seg.startswith('%') and \
-           target_file_path_seg.endswith('%'):
-            if target_file_path_seg[1:-1] not in file_path_seg:
-                return False
-        elif target_file_path_seg.startswith('%'):
-            if not file_path_seg.endswith(target_file_path_seg[1:]):
-                return False
-        elif target_file_path_seg.endswith('%'):
-            if not file_path_seg.startswith(target_file_path_seg[:-1]):
-                return False
-        else:
-            if file_path_seg != target_file_path_seg:
-                return False
-    return True
+# based on https://github.com/encode/httpx/discussions/2296
+class HttpxResponseFileStreamAdapter:
+    def __init__(self, response):
+        self.source = response.iter_bytes()
+        self.buffer = b''
+        self.buffer_offset = 0
 
-
-def is_folder(file_or_folder):
-    return hasattr(file_or_folder, 'files')
-
-
-def flatten(store):
-    files = store.files
-    for file_ in files:
-        yield file_
-    for folder_ in store.folders:
-        yield folder_
-        yield from flatten(folder_)
-
-
-def find_ancestral_folder(store, target_file_path):
-    file_path_segs = target_file_path.split('/')
-    if(len(file_path_segs) <= 1):
-        return None
-    folder = store
-    path = ''
-    i = 0
-    is_found = False
-    for i in range(len(file_path_segs) - 1):
-        path += file_path_segs[i]
-        is_found = False
-        for folder_ in folder.folders:
-            if norm_remote_path(folder_.path) == path:
-                folder = folder_
-                is_found = True
+    def read(self, size):
+        while len(self.buffer) - self.buffer_offset < size:
+            try:
+                self.buffer += next(self.source)
+            except StopIteration:
                 break
-        if not is_found:
-            break
-        path += '/'
-    return folder if i > 0 or is_found else None
 
-
-def find_by_path(store, target_file_path):
-    if target_file_path is None:
-        return None
-    file_path_segs = target_file_path.split('/')
-    if(len(file_path_segs) == 1):
-        for file_ in store.files:
-            if norm_remote_path(file_.path) == target_file_path:
-                return file_
-        for folder_ in store.folders:
-            if norm_remote_path(folder_.path) == target_file_path:
-                return folder_
-        return None
-    else:
-        parent_target_file_path = '/'.join(file_path_segs[:-1])
-        parent_result = find_by_path(store, parent_target_file_path)
-        if parent_result is None:
-            return None
-        else:
-            if is_folder(parent_result):
-                for file_ in parent_result.files:
-                    if norm_remote_path(file_.path) == target_file_path:
-                        return file_
-                for folder_ in parent_result.folders:
-                    if norm_remote_path(folder_.path) == target_file_path:
-                        return folder_
-            return None
-
-
-def filter_by_path_pattern(store, target_file_path):
-    yield from _filter_by_path_pattern(store, target_file_path, 0)
-
-
-def _filter_by_path_pattern(store, target_file_path, depth):
-    if target_file_path is None or target_file_path == '/':
-        yield from flatten(store)
-        return
-    file_path_segs = target_file_path.split('/')
-    if file_path_segs[0] == '':
-        file_path_segs = file_path_segs[1:]
-    if file_path_segs[-1] == '':
-        file_path_segs = file_path_segs[:-1]
-    if(len(file_path_segs) == 1):
-        for file_ in store.files:
-            if _is_path_matched(target_file_path, file_.path):
-                yield file_
-        for folder_ in store.folders:
-            if _is_path_matched(target_file_path, folder_.path):
-                yield folder_
-                if depth == 0:
-                    yield from flatten(folder_)
-    else:
-        parent_target_file_path = '/' + '/'.join(file_path_segs[:-1]) + '/'
-        parent_result = _filter_by_path_pattern(store, parent_target_file_path, depth + 1)
-        for rf_ in parent_result:
-            if is_folder(rf_):
-                for file_ in rf_.files:
-                    if _is_path_matched(target_file_path, file_.path):
-                        yield file_
-                for folder_ in rf_.folders:
-                    if _is_path_matched(target_file_path, folder_.path):
-                        yield folder_
-                        if depth == 0:
-                            yield from flatten(folder_)
+        if len(self.buffer) - self.buffer_offset >= size:
+            data = self.buffer[self.buffer_offset:self.buffer_offset + size]
+            self.buffer_offset += size
+            return data
+        data = self.buffer[self.buffer_offset:]
+        self.buffer = b''
+        self.buffer_offset = 0
+        return data

@@ -1,11 +1,12 @@
 import numbers
+from typing import Any, Optional, Generator
 
 from .session import OSFSession
 
 
 # Base class for all models and the user facing API object
 class OSFCore(object):
-    def __init__(self, json, session=None):
+    def __init__(self, json: Any, session: Optional[OSFSession]=None):
         if session is None:
             self.session = OSFSession()
         else:
@@ -19,19 +20,22 @@ class OSFCore(object):
     def _build_url(self, *args):
         return self.session.build_url(*args)
 
-    def _get(self, url, *args, **kwargs):
-        return self.session.get(url, *args, **kwargs)
+    async def _get(self, url: str, *args, **kwargs):
+        return await self.session.get(url, *args, **kwargs)
 
-    def _put(self, url, *args, **kwargs):
-        return self.session.put(url, *args, **kwargs)
+    async def _get_stream(self, url: str, *args, **kwargs):
+        return await self.session.get_stream(url, *args, **kwargs)
 
-    def _post(self, url, *args, **kwargs):
-        return self.session.post(url, *args, **kwargs)
+    async def _put(self, url: str, *args, **kwargs):
+        return await self.session.put(url, *args, **kwargs)
 
-    def _delete(self, url, *args, **kwargs):
-        return self.session.delete(url, *args, **kwargs)
+    async def _post(self, url: str, *args, **kwargs):
+        return await self.session.post(url, *args, **kwargs)
 
-    def _get_attribute(self, json, *keys, **kwargs):
+    async def _delete(self, url: str, *args, **kwargs):
+        return await self.session.delete(url, *args, **kwargs)
+
+    def _get_attribute(self, json, *keys, **kwargs) -> Any:
         # pick value out of a (nested) dictionary/JSON
         # `keys` is a list of keys
         # XXX what should happen if a key doesn't match half way down
@@ -50,7 +54,7 @@ class OSFCore(object):
 
         return value
 
-    def _json(self, response, status_code):
+    def _json(self, response, status_code) -> Any:
         """Extract JSON from response if `status_code` matches."""
         if isinstance(status_code, numbers.Integral):
             status_code = (status_code,)
@@ -62,15 +66,13 @@ class OSFCore(object):
                                "code {} not {}".format(response.status_code,
                                                        status_code))
 
-    def _follow_next(self, url):
+    async def _follow_next(self, url: str):
         """Follow the 'next' link on paginated results."""
-        response = self._json(self._get(url), 200)
-        data = response['data']
+        response = self._json(await self._get(url), 200)
+        yield response['data']
 
         next_url = self._get_attribute(response, 'links', 'next')
         while next_url is not None:
-            response = self._json(self._get(next_url), 200)
-            data.extend(response['data'])
+            response = self._json(await self._get(next_url), 200)
+            yield response['data']
             next_url = self._get_attribute(response, 'links', 'next')
-
-        return data
