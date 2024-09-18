@@ -79,6 +79,28 @@ def MockAsyncIterator(items):
     return mock
 
 
+def MockAsyncContextManager(target):
+    mock = AsyncMock()
+    mock.__aenter__.return_value = target
+    return mock
+
+
+def MockAsyncWriter(fp):
+    def write_async(data):
+        fp.write(data)
+        return FutureWrapper()
+    mock = AsyncMock()
+    mock.write.side_effect = write_async
+    mock.mode = fp.mode
+    return mock
+
+
+def MockStream(path, mode):
+    mock = MagicMock(name='Stream-%s' % path, mode=mode)
+    mock.seek = MagicMock(return_value=FutureWrapper())
+    return mock
+
+
 def MockProject(name):
     mock = MagicMock(name='Project-%s' % name,
                      storages=MockAsyncIterator([MockStorage('osfstorage'), MockStorage('gh')]))
@@ -154,3 +176,11 @@ def FutureFakeResponse(status_code, json):
 
 def is_folder_mock(file_or_folder):
     return file_or_folder._mock_name.startswith('Folder-')
+
+
+def mock_async_open(stream=None):
+    return MagicMock(
+        side_effect=lambda path, mode: MockAsyncContextManager(
+            MockStream(path, mode) if stream is None else stream
+        )
+    )

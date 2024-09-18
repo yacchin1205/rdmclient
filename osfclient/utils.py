@@ -6,14 +6,11 @@ Helpers and other assorted functions.
 import hashlib
 import os
 import six
+import aiofiles
 
 
 KNOWN_PROVIDERS = ['osfstorage', 'github', 'figshare', 'googledrive']
 
-
-async def _async_generator(l):
-    for elem in l:
-        yield elem
 
 def norm_remote_path(path: str) -> str:
     """Normalize `path`.
@@ -75,8 +72,21 @@ def file_empty(fp):
         return not fp.peek()
 
 
-def checksum(file_path, hash_type='md5', block_size=65536):
+async def checksum_path(file_path, hash_type='md5', block_size=65536):
     """Returns either the md5 or sha256 hash of a file at `file_path`.
+
+    md5 is the default hash_type as it is faster than sha256
+
+    The default block size is 64 kb, which appears to be one of a few command
+    choices according to https://stackoverflow.com/a/44873382/2680. The code
+    below is an extension of the example presented in that post.
+    """
+    async with aiofiles.open(file_path, 'rb') as f:
+        return await checksum_fp(f, hash_type, block_size)
+
+
+async def checksum_fp(fp, hash_type='md5', block_size=65536):
+    """Returns either the md5 or sha256 hash of a file indicated by file pointer `fp`.
 
     md5 is the default hash_type as it is faster than sha256
 
@@ -94,9 +104,8 @@ def checksum(file_path, hash_type='md5', block_size=65536):
             .format(hash_type)
         )
 
-    with open(file_path, 'rb') as f:
-        for block in iter(lambda: f.read(block_size), b''):
-            hash_.update(block)
+    async for block in fp:
+        hash_.update(block)
     return hash_.hexdigest()
 
 
@@ -105,27 +114,3 @@ def get_local_file_size(fp):
     # one-liner to get file size from file pointer explained at
     # https://stackoverflow.com/a/283719/2680824
     return os.fstat(fp.fileno()).st_size
-
-
-# based on https://github.com/encode/httpx/discussions/2296
-class HttpxResponseFileStreamAdapter:
-    def __init__(self, response):
-        self.source = response.iter_bytes()
-        self.buffer = b''
-        self.buffer_offset = 0
-
-    def read(self, size):
-        while len(self.buffer) - self.buffer_offset < size:
-            try:
-                self.buffer += next(self.source)
-            except StopIteration:
-                break
-
-        if len(self.buffer) - self.buffer_offset >= size:
-            data = self.buffer[self.buffer_offset:self.buffer_offset + size]
-            self.buffer_offset += size
-            return data
-        data = self.buffer[self.buffer_offset:]
-        self.buffer = b''
-        self.buffer_offset = 0
-        return data

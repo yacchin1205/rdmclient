@@ -1,3 +1,4 @@
+from functools import partial
 import os
 import six
 
@@ -7,9 +8,10 @@ from .core import OSFCore
 from .file import ContainerMixin
 from .file import File
 from .file import Folder
-from ..utils import checksum
+from ..utils import checksum_fp
 from ..utils import get_local_file_size
 from ..utils import norm_remote_path
+from .utils import find_by_path
 
 
 if six.PY2:
@@ -63,8 +65,8 @@ class Storage(OSFCore, ContainerMixin):
         To force overwrite of an existing file, set `force=True`.
         To overwrite an existing file only if the files differ, set `update=True`
         """
-        #if 'b' not in fp.mode:
-        #    raise ValueError("File has to be opened in binary mode.")
+        if 'b' not in fp.mode:
+           raise ValueError("File has to be opened in binary mode.")
 
         # all paths are assumed to be absolute
         path = norm_remote_path(path)
@@ -89,10 +91,10 @@ class Storage(OSFCore, ContainerMixin):
         # turns out to be of length zero then no file is created on the OSF.
         # See: https://github.com/osfclient/osfclient/pull/135
         if get_local_file_size(fp) == 0:
-            response = await self._put(url, params={'name': fname}, data=b'')
+            response = await self._put(url, params={'name': fname}, content=b'')
         else:
             try:
-                response = await self._put(url, params={'name': fname}, data=fp)
+                response = await self._put(url, params={'name': fname}, content=fp)
             except ConnectionError:
                 connection_error = True
 
@@ -115,19 +117,12 @@ class Storage(OSFCore, ContainerMixin):
 
             else:
                 # find the upload URL for the file we are trying to update
-                async for file_ in self.files:
-                    if norm_remote_path(file_.path) == path:
-                        if not force:
-                            if checksum(path) == file_.hashes.get('md5'):
-                                # If the hashes are equal and force is False,
-                                # we're done here
-                                break
-                        # in the process of attempting to upload the file we
-                        # moved through it -> reset read position to beginning
-                        # of the file
-                        #fp.seek(0)
-                        await file_.update(fp)
-                        break
-                else:
-                    raise RuntimeError("Could not create a new file at "
-                                    "({}) nor update it.".format(path))
+                file_ = await find_by_path(self, path)
+                if file_ is None:
+                    raise RuntimeError("Could not find file at ({}) to update.".format(path))
+                await fp.seek(0)
+                if not force and await checksum_fp(fp) == file_.hashes.get('md5'):
+                    # If the hashes are equal and force is False, we're done here
+                    return
+                await fp.seek(0)
+                await file_.update(fp)

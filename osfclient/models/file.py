@@ -4,10 +4,11 @@ from tqdm import tqdm
 
 from .core import OSFCore
 from ..exceptions import FolderExistsException, UnauthorizedException
-from ..utils import get_local_file_size, HttpxResponseFileStreamAdapter
+from ..utils import get_local_file_size
 
 
 OSFCoreType = TypeVar('OSFCoreType', bound=OSFCore)
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 class tqdm_indeterminate(tqdm):
@@ -25,7 +26,7 @@ class tqdm_indeterminate(tqdm):
         return d
 
 
-def copyfileobj(fsrc, fdst, total, length=16*1024):
+async def copyfileobj(fsrc, fdst, total, length=16*1024):
     """Copy data from file-like object fsrc to file-like object fdst
 
     This is like shutil.copyfileobj but with a progressbar.
@@ -35,11 +36,8 @@ def copyfileobj(fsrc, fdst, total, length=16*1024):
           if total is not None else
           tqdm_indeterminate(unit='bytes', unit_scale=True,
                              bar_format=format_ind_loop)) as pbar:
-        while 1:
-            buf = fsrc.read(length)
-            if not buf:
-                break
-            fdst.write(buf)
+        async for buf in fsrc:
+            await fdst.write(buf)
             pbar.update(len(buf))
 
 
@@ -81,16 +79,19 @@ class File(OSFCore):
             raise ValueError("File has to be opened in binary mode.")
 
         try:
-            response = await self._get_stream(self._download_url)
+            client = self._get_stream(self._download_url)
+            async with client as response:
+                if response.status_code == 401:
+                    raise UnauthorizedException("Unauthorized access to file")
+                await copyfileobj(response.aiter_bytes(DOWNLOAD_CHUNK_SIZE), fp,
+                            int(response.headers['Content-Length'])
+                            if 'Content-Length' in response.headers else None)
         except UnauthorizedException:
-            response = await self._get_stream(self._upload_url)
-        if response.status_code == 200:
-            bodycontent = HttpxResponseFileStreamAdapter(response)
-            copyfileobj(bodycontent, fp,
-                        int(response.headers['Content-Length'])
-                        if 'Content-Length' in response.headers else None)
-
-        else:
+            async with self._get_stream(self._upload_url) as response:
+                await copyfileobj(response.aiter_bytes(DOWNLOAD_CHUNK_SIZE), fp,
+                            int(response.headers['Content-Length'])
+                            if 'Content-Length' in response.headers else None)
+        if response.status_code != 200:
             raise RuntimeError("Response has status "
                                "code {}.".format(response.status_code))
 
@@ -114,9 +115,9 @@ class File(OSFCore):
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF
         if get_local_file_size(fp) > 0:
-            response = await self._put(url, data=fp)
+            response = await self._put(url, content=fp)
         else:
-            response = await self._put(url, data=b'')
+            response = await self._put(url, content=b'')
 
         if response.status_code != 200:
             msg = ('Could not update {} (status '
@@ -143,7 +144,7 @@ class File(OSFCore):
 
 class ContainerMixin:
     async def _iter_children(
-        self, url, kind, klass: Type[OSFCoreType], recurse=None, target_filter=None
+        self, url: str, kind, klass: Type[OSFCoreType], recurse=None, target_filter=None
     ) -> AsyncGenerator[OSFCoreType, None]:
         """Iterate over all children of `kind`
 

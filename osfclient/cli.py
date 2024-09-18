@@ -9,6 +9,7 @@ import getpass
 import os
 import sys
 
+import aiofiles
 from six.moves import configparser
 from six.moves import input
 
@@ -18,7 +19,7 @@ from tzlocal import get_localzone
 
 from .api import OSF
 from .exceptions import UnauthorizedException
-from .utils import norm_remote_path, split_storage, makedirs, checksum
+from .utils import norm_remote_path, split_storage, makedirs, checksum_path
 from .models.utils import (
     is_folder, flatten, find_ancestral_folder, find_by_path, filter_by_path_pattern,
 )
@@ -190,12 +191,12 @@ async def clone(args):
 
                 path = os.path.join(prefix, path)
                 if os.path.exists(path) and args.update:
-                    if checksum(path) == file_.hashes.get('md5'):
+                    if await checksum_path(path) == file_.hashes.get('md5'):
                         continue
                 directory, _ = os.path.split(path)
                 makedirs(directory, exist_ok=True)
 
-                with open(path, "wb") as f:
+                async with aiofiles.open(path, "wb") as f:
                     await file_.write_to(f)
 
                 pbar.update()
@@ -240,11 +241,11 @@ async def fetch(args):
     if file_ is None or is_folder(file_):
         return
     if local_path_exists and not args.force and args.update:
-        if file_.hashes.get('md5') == checksum(local_path):
+        if file_.hashes.get('md5') == await checksum_path(local_path):
             print("Local file %s already matches remote." % local_path)
             return
-    with open(local_path, 'wb') as fp:
-        file_.write_to(fp)
+    async with aiofiles.open(local_path, 'wb') as fp:
+        await file_.write_to(fp)
 
 
 @might_need_auth
@@ -337,7 +338,7 @@ async def upload(args):
             subdir_path = os.path.relpath(root, args.source)
             for fname in files:
                 local_path = os.path.join(root, fname)
-                with open(local_path, 'rb') as fp:
+                async with aiofiles.open(local_path, 'rb') as fp:
                     # build the remote path + fname
                     name = os.path.join(remote_path, dir_name, subdir_path,
                                         fname)
@@ -345,7 +346,7 @@ async def upload(args):
                                             update=args.update)
 
     else:
-        with open(args.source, 'rb') as fp:
+        async with aiofiles.open(args.source, 'rb') as fp:
             await store.create_file(remote_path, fp, force=args.force,
                                     update=args.update)
 

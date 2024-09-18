@@ -16,6 +16,7 @@ from osfclient.models.file import _WaterButlerFolder
 from osfclient.tests import fake_responses
 from osfclient.tests.mocks import (
     FutureFakeResponse, FakeResponse, MockFolder, MockAsyncIterator,
+    MockAsyncContextManager, MockAsyncWriter,
 )
 
 _files_url = 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/foo123'
@@ -285,14 +286,14 @@ async def test_file_uses_streaming_request():
     def fake_get_stream(url):
         src = io.BytesIO(file_content)
         res = FakeResponse(200, {})
-        res.iter_bytes = lambda: iter(partial(src.read, 64), b'')
+        res.aiter_bytes = lambda chunk_size: MockAsyncIterator(iter(partial(src.read, 64), b''))
         res.headers = {'Content-Length': str(len(file_content))}
-        return res
+        return MockAsyncContextManager(res)
 
     with patch.object(File, "_get_stream", side_effect=fake_get_stream) as mock_get:
         f = File({})
         f._download_url = "http://example.com/download_url/"
-        await f.write_to(fp)
+        await f.write_to(MockAsyncWriter(fp))
 
     fp.seek(0)
     assert file_content == fp.read()
@@ -309,16 +310,15 @@ async def test_file_uses_streaming_request_without_content_length():
 
     def fake_get_stream(url):
         src = io.BytesIO(file_content)
-
         res = FakeResponse(200, {})
-        res.iter_bytes = lambda: iter(partial(src.read, 64), b'')
+        res.aiter_bytes = lambda chunk_size: MockAsyncIterator(iter(partial(src.read, 64), b''))
         res.headers = {}
-        return res
+        return MockAsyncContextManager(res)
 
     with patch.object(File, "_get_stream", side_effect=fake_get_stream) as mock_get:
         f = File({})
         f._download_url = "http://example.com/download_url/"
-        await f.write_to(fp)
+        await f.write_to(MockAsyncWriter(fp))
 
     fp.seek(0)
     assert file_content == fp.read()
@@ -340,18 +340,18 @@ async def test_file_with_new_api():
         src = io.BytesIO(file_content)
 
         if url == web_url:
-            raise UnauthorizedException()
+            res = FakeResponse(401, {})
         else:
             res = FakeResponse(200, {})
-        res.iter_bytes = lambda: iter(partial(src.read, 64), b'')
+        res.aiter_bytes = lambda chunk_size: MockAsyncIterator(iter(partial(src.read, 64), b''))
         res.headers = {'Content-Length': str(len(file_content))}
-        return res
+        return MockAsyncContextManager(res)
 
     with patch.object(File, "_get_stream", side_effect=fake_get_stream) as mock_get:
         f = File({})
         f._download_url = web_url
         f._upload_url = api_url
-        await f.write_to(fp)
+        await f.write_to(MockAsyncWriter(fp))
 
     fp.seek(0)
     assert file_content == fp.read()

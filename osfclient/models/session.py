@@ -55,12 +55,9 @@ class OSFSession(httpx.AsyncClient):
             raise UnauthorizedException()
         return response
 
-    async def get_stream(self, url: str, *args, **kwargs):
+    def get_stream(self, url: str, *args, **kwargs):
         kwargs_ = self.modify_kwargs(kwargs)
-        response = await super(OSFSession, self).stream('GET', url, *args, **kwargs_)
-        if response.status_code == 401:
-            raise UnauthorizedException()
-        return response
+        return super(OSFSession, self).stream('GET', url, *args, **kwargs_)
 
     def modify_kwargs(self, kwargs: Dict) -> Dict:
         if 'follow_redirects' in kwargs:
