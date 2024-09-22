@@ -113,7 +113,6 @@ async def test_base_url(MockOSFClass):
 async def test_list(capsys):
     args = MockArgs(project='f3szh')
 
-    njson = fake_responses._build_node('nodes')
     rjson = fake_responses.files_node('f3szh', 'osfstorage',
                                       file_names=['hello.txt', 'bye.txt'],
                                       folder_names=['folder1', 'folder2'])
@@ -124,18 +123,14 @@ async def test_list(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2/nodes/f3szh/':
-            return FakeResponse(200, njson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+        elif url == 'https://files.osf.io/v1/resources/f3szh/providers/osfstorage/':
             return FakeResponse(200, rjson)
-        elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/folder1123/':
+        elif url == 'https://files.osf.io/v1/resources/9zpcy/providers/osfstorage/folder1123/':
             return FakeResponse(200, fjson1)
-        elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/folder2123/':
+        elif url == 'https://files.osf.io/v1/resources/9zpcy/providers/osfstorage/folder2123/':
             return FakeResponse(200, fjson2)
-        elif url == 'https://api.osf.io/v2/guids/f3szh/':
-            return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
             raise ValueError()
@@ -156,7 +151,6 @@ async def test_list(capsys):
 async def test_sublist_exists(capsys):
     args = MockArgs(project='f3szh', base_path='osfstorage/folder2/')
 
-    njson = fake_responses._build_node('nodes')
     rjson = fake_responses.files_node('f3szh', 'osfstorage',
                                       file_names=['hello.txt', 'bye.txt'],
                                       folder_names=['folder1', 'folder2'])
@@ -167,16 +161,12 @@ async def test_sublist_exists(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2/nodes/f3szh/':
-            return FakeResponse(200, njson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+        elif url == 'https://files.osf.io/v1/resources/f3szh/providers/osfstorage/':
             return FakeResponse(200, rjson)
-        elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/folder2123/':
+        elif url == 'https://files.osf.io/v1/resources/9zpcy/providers/osfstorage/folder2123/':
             return FakeResponse(200, fjson2)
-        elif url == 'https://api.osf.io/v2/guids/f3szh/':
-            return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
             raise ValueError()
@@ -193,16 +183,11 @@ async def test_sublist_exists(capsys):
 async def test_sublist_empty(capsys):
     args = MockArgs(project='f3szh', base_path='googledrive/')
 
-    njson = fake_responses._build_node('nodes')
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2/nodes/f3szh/':
-            return FakeResponse(200, njson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
-        elif url == 'https://api.osf.io/v2/guids/f3szh/':
-            return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
             raise ValueError()
@@ -220,7 +205,6 @@ async def test_long_format_list(capsys):
     args = MockArgs(project='f3szh', long_format=True)
 
     dates = ['"2019-02-20T14:02:00.000000Z"', '"2019-02-19T17:01:00.000000Z"']
-    njson = fake_responses._build_node('nodes')
     fjson = fake_responses.files_node('f3szh', 'osfstorage',
                                       file_names=['hello.txt', 'bye.txt'],
                                       file_sizes=['5', '3'],
@@ -228,14 +212,10 @@ async def test_long_format_list(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2/nodes/f3szh/':
-            return FakeResponse(200, njson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+        elif url == 'https://files.osf.io/v1/resources/f3szh/providers/osfstorage/':
             return FakeResponse(200, fjson)
-        elif url == 'https://api.osf.io/v2/guids/f3szh/':
-            return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
             raise ValueError()
@@ -258,7 +238,6 @@ async def test_long_format_list_with_null(capsys):
     args = MockArgs(project='f3szh', long_format=True)
 
     dates = ['null', 'null']
-    njson = fake_responses._build_node('nodes')
     fjson = fake_responses.files_node('f3szh', 'osfstorage',
                                       file_names=['hello.txt', 'bye.txt'],
                                       file_sizes=['null', 'null'],
@@ -266,14 +245,10 @@ async def test_long_format_list_with_null(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2/nodes/f3szh/':
-            return FakeResponse(200, njson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
-        elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
+        elif url == 'https://files.osf.io/v1/resources/f3szh/providers/osfstorage/':
             return FakeResponse(200, fjson)
-        elif url == 'https://api.osf.io/v2/guids/f3szh/':
-            return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
             raise ValueError()

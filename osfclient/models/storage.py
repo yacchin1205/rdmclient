@@ -23,7 +23,7 @@ if six.PY2:
 
 
 class Storage(OSFCore, ContainerMixin):
-    _files_key = ('relationships', 'files', 'links', 'related', 'href')
+    _files_key = ('links', 'upload')
 
     def _update_attributes(self, storage):
         if not storage:
@@ -54,6 +54,12 @@ class Storage(OSFCore, ContainerMixin):
     def folders(self):
         """Iterate over all folders in this storage."""
         return self._iter_children(self._files_url, 'folder', Folder)
+
+    @property
+    def children(self):
+        """Iterate over all children in this storage."""
+        return self._iter_children_for_mixed_types(self._files_url,
+                                                   {'file': File, 'folder': Folder})
 
     async def create_file(self, path: str, fp, force=False, update=False):
         """Store a new file at `path` in this storage.

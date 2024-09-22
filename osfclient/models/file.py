@@ -1,5 +1,5 @@
 import io
-from typing import Type, AsyncGenerator, TypeVar
+from typing import Type, AsyncGenerator, TypeVar, Dict, Any
 from tqdm import tqdm
 
 from .core import OSFCore
@@ -48,19 +48,32 @@ class File(OSFCore):
 
         self.id = self._get_attribute(file, 'id')
 
-        self._endpoint = self._get_attribute(file, 'links', 'self')
         self._download_url = self._get_attribute(file, 'links', 'download')
         self._upload_url = self._get_attribute(file, 'links', 'upload')
         self._delete_url = self._get_attribute(file, 'links', 'delete')
         self._move_url = self._get_attribute(file, 'links', 'move')
         self.osf_path = self._get_attribute(file, 'attributes', 'path')
         self.path = self._get_attribute(file,
-                                        'attributes', 'materialized_path')
+                                        'attributes', 'materialized')
         self.name = self._get_attribute(file, 'attributes', 'name')
         self.date_created = self._get_attribute(file,
-                                                'attributes', 'date_created')
+                                                'attributes', 'created_utc',
+                                                default='')
         self.date_modified = self._get_attribute(file,
-                                                 'attributes', 'date_modified')
+                                                 'attributes', 'modified_utc',
+                                                 default='')
+        if not self.date_created:
+            self.date_created = self._get_attribute(file,
+                                                    'attributes', 'created',
+                                                    default='')
+        if not self.date_modified:
+            self.date_modified = self._get_attribute(file,
+                                                     'attributes', 'modified',
+                                                     default='')
+        if self.date_created == '':
+            self.date_created = None
+        if self.date_modified == '':
+            self.date_modified = None
         self.size = self._get_attribute(file, 'attributes', 'size')
         self.hashes = self._get_attribute(file,
                                           'attributes', 'extra', 'hashes',
@@ -167,6 +180,31 @@ class ContainerMixin:
                                                            target_filter=target_filter):
                         yield entry
 
+    async def _iter_children_for_mixed_types(
+        self, url: str, klasses: Dict[str, Type], recurse=None, target_filter=None
+    ) -> AsyncGenerator[OSFCore, None]:
+        """Iterate over all children
+
+        _iter_children_for_mixed_types is a more general version of _iter_children
+        that can handle multiple kinds of children. It takes a dictionary of
+        `klasses` that maps kinds to classes.
+        """
+        async for children in self._follow_next(url):
+            for child in children:
+                if target_filter is not None and not target_filter(child):
+                    continue
+                kind = child['attributes']['kind']
+                klass = klasses.get(kind)
+                if klass is not None:
+                    yield klass(child, self.session)
+                if kind != 'file' and recurse is not None:
+                    # recurse into a child and add entries to `children`
+                    url = self._get_attribute(child, *recurse)
+                    async for entry in self._iter_children_for_mixed_types(
+                        url, klasses, recurse=recurse, target_filter=target_filter
+                    ):
+                        yield entry
+
     @property
     def files(self):
         """Iterate over all files in this folder.
@@ -181,6 +219,13 @@ class ContainerMixin:
         """Iterate over top-level folders in this folder."""
         return self._iter_children(self._files_url, 'folder', Folder)
 
+    @property
+    def children(self):
+        """Iterate over all children in this folder."""
+        return self._iter_children_for_mixed_types(self._files_url,
+                                                   {'file': File, 'folder': Folder})
+
+
     async def create_folder(self, name, exist_ok=False):
         url = self._new_folder_url
         # Create a new sub-folder
@@ -194,7 +239,7 @@ class ContainerMixin:
                     return folder
 
         elif response.status_code == 201:
-            return _WaterButlerFolder(response.json()['data'], self.session)
+            return Folder(response.json()['data'], self.session)
 
         else:
             raise RuntimeError("Response has status code {} while creating "
@@ -209,25 +254,36 @@ class Folder(OSFCore, ContainerMixin):
 
         self.id = self._get_attribute(file, 'id')
 
-        self._endpoint = self._get_attribute(file, 'links', 'self')
-
         self._delete_url = self._get_attribute(file, 'links', 'delete')
         self._new_folder_url = self._get_attribute(file, 'links', 'new_folder')
         self._new_file_url = self._get_attribute(file, 'links', 'upload')
         self._move_url = self._get_attribute(file, 'links', 'move')
 
-        self._files_key = ('relationships', 'files', 'links', 'related',
-                           'href')
+        self._files_key = ('links', 'move')
         self._files_url = self._get_attribute(file, *self._files_key)
 
         self.osf_path = self._get_attribute(file, 'attributes', 'path')
         self.path = self._get_attribute(file,
-                                        'attributes', 'materialized_path')
+                                        'attributes', 'materialized')
         self.name = self._get_attribute(file, 'attributes', 'name')
         self.date_created = self._get_attribute(file,
-                                                'attributes', 'date_created')
+                                                'attributes', 'created_utc',
+                                                default='')
         self.date_modified = self._get_attribute(file,
-                                                 'attributes', 'date_modified')
+                                                 'attributes', 'modified_utc',
+                                                 default='')
+        if not self.date_created:
+            self.date_created = self._get_attribute(file,
+                                                    'attributes', 'created',
+                                                    default='')
+        if not self.date_modified:
+            self.date_modified = self._get_attribute(file,
+                                                     'attributes', 'modified',
+                                                     default='')
+        if self.date_created == '':
+            self.date_created = None
+        if self.date_modified == '':
+            self.date_modified = None
 
     def __str__(self):
         return '<Folder [{0}, {1}]>'.format(self.id, self.path)
@@ -255,27 +311,3 @@ class Folder(OSFCore, ContainerMixin):
                                'code: {}).'.format(self.path,
                                                    response.status_code))
 
-
-class _WaterButlerFolder(OSFCore, ContainerMixin):
-    """A slimmed down `Folder` built from a WaterButler response
-
-    This representation is enough to navigate the folder structure
-    and create new, rename and delete sub-folders.
-
-    Users should never see this, always show them a full `Folder`.
-    """
-    def __str__(self):
-        return '<_WaterButlerFolder [{0}]>'.format(self.id)
-
-    def _update_attributes(self, file):
-        if not file:
-            return
-
-        self.id = self._get_attribute(file, 'id')
-
-        self.osf_path = self._get_attribute(file, 'attributes', 'path')
-
-        self._delete_url = self._get_attribute(file, 'links', 'delete')
-        self._new_folder_url = self._get_attribute(file, 'links', 'new_folder')
-        self._new_file_url = self._get_attribute(file, 'links', 'upload')
-        self._move_url = self._get_attribute(file, 'links', 'move')

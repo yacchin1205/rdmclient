@@ -31,16 +31,26 @@ class OSF(OSFCore):
         self.session.token_auth(token)
 
     async def project(self, project_id):
-        """Fetch project `project_id`."""
-        type_ = await self.guid(project_id)
-        url = self._build_url(type_, project_id)
-        if type_ in Project._types:
-            return Project(self._json(await self._get(url), 200), self.session)
-        raise OSFException('{} is unrecognized type {}. Clone supports projects and registrations'.format(project_id, type_))
+        """Fetch project `project_id`.
 
-    async def guid(self, guid):
-        """Determines JSONAPI type for provided GUID"""
-        return self._json(await self._get(self._build_url('guids', guid)), 200)['data']['type']
+        GakuNin RDM assumes only node as a project (not including registrations),
+        so it does not acquire GUID information.
+        """
+        url = self._build_url('nodes', project_id, 'files')
+        return Project({
+            'data': {
+                'id': project_id,
+                'relationships': {
+                    'files': {
+                        'links': {
+                            'related': {
+                                'href': url
+                            }
+                        }
+                    }
+                }
+            }
+        }, self.session)
 
     @property
     def username(self):
