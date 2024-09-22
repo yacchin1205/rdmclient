@@ -19,7 +19,7 @@ from osfclient.tests.mocks import FutureWrapper
 
 @pytest.mark.asyncio
 @patch('osfclient.cli.OSF')
-async def test_anonymous_doesnt_use_password(MockOSFClass):
+async def test_anonymous_doesnt_use_token(MockOSFClass):
     MockOSF = MagicMock()
     MockOSFClass.return_value = MockOSF
     MockOSF.project = MagicMock(side_effect=lambda p: FutureWrapper(MockProject(p)))
@@ -33,34 +33,9 @@ async def test_anonymous_doesnt_use_password(MockOSFClass):
                side_effect=simple_getenv) as mock_getenv:
         await list_(args)
 
-    # if there is no username we should not try to obtain a password either
-    assert call('OSF_USERNAME') in mock_getenv.mock_calls
-    assert call('OSF_PASSWORD') not in mock_getenv.mock_calls
-    MockOSFClass.assert_called_once_with(username=None, password=None,
-                                         token=None, base_url=None)
-
-
-@pytest.mark.asyncio
-@patch('osfclient.cli.OSF')
-async def test_username_password(MockOSFClass):
-    MockOSF = MagicMock()
-    MockOSFClass.return_value = MockOSF
-    MockOSF.project = MagicMock(side_effect=lambda p: FutureWrapper(MockProject(p)))
-    MockOSF.aclose = lambda: FutureWrapper()
-    args = MockArgs(username='joe@example.com', project='1234')
-
-    def simple_getenv(key):
-        if key == 'OSF_PASSWORD':
-            return 'secret'
-
-    with patch('osfclient.cli.os.getenv',
-               side_effect=simple_getenv) as mock_getenv:
-        await list_(args)
-
-    MockOSFClass.assert_called_once_with(username='joe@example.com',
-                                         password='secret', token=None,
-                                         base_url=None)
-    mock_getenv.assert_called_with('OSF_PASSWORD')
+    # We should not try to obtain a token
+    assert call('OSF_TOKEN') in mock_getenv.mock_calls
+    MockOSFClass.assert_called_once_with(token=None, base_url=None)
 
 
 @pytest.mark.asyncio
@@ -80,8 +55,7 @@ async def test_token(MockOSFClass):
                side_effect=simple_getenv) as mock_getenv:
         await list_(args)
 
-    MockOSFClass.assert_called_once_with(username=None,
-                                         password=None, token='secret',
+    MockOSFClass.assert_called_once_with(token='secret',
                                          base_url=None)
     mock_getenv.assert_called_with('OSF_TOKEN')
 
@@ -103,8 +77,7 @@ async def test_base_url(MockOSFClass):
                side_effect=simple_getenv) as mock_getenv:
         await list_(args)
 
-    MockOSFClass.assert_called_once_with(username=None,
-                                         password=None, token='secret',
+    MockOSFClass.assert_called_once_with(token='secret',
                                          base_url='https://api.test.osf.io/v2/')
     mock_getenv.assert_called_with('OSF_TOKEN')
 
