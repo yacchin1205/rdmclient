@@ -5,8 +5,6 @@ from ..exceptions import UnauthorizedException
 
 
 class OSFSession(httpx.AsyncClient):
-    auth = None
-
     def __init__(self):
         """Handle HTTP session related work."""
         super(OSFSession, self).__init__()
@@ -24,11 +22,6 @@ class OSFSession(httpx.AsyncClient):
 
     def set_endpoint(self, base_url: str):
         self.base_url = base_url
-
-    def basic_auth(self, username, password):
-        self.auth = (username, password)
-        if 'Authorization' in self.headers:
-            self.headers.pop('Authorization')
 
     def token_auth(self, token: str):
         self.headers['Authorization'] = 'Bearer ' + token

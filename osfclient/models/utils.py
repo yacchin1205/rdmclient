@@ -38,13 +38,12 @@ def is_folder(file_or_folder: OSFCore):
 
 
 async def flatten(store: ContainerMixin) -> AsyncGenerator[Union[File, Folder], None]:
-    files = store.files
-    async for file_ in files:
+    async for file_ in store.children:
         yield file_
-    async for folder_ in store.folders:
-        yield folder_
-        async for file_ in flatten(folder_):
-            yield file_
+        if not is_folder(file_):
+            continue
+        async for child_file_ in flatten(file_):
+            yield child_file_
 
 
 async def find_ancestral_folder(store: ContainerMixin, target_file_path: str) -> Optional[ContainerMixin]:
@@ -74,27 +73,20 @@ async def find_by_path(store: ContainerMixin, target_file_path: str) -> Optional
         return None
     file_path_segs = target_file_path.split('/')
     if(len(file_path_segs) == 1):
-        async for file_ in store.files:
+        async for file_ in store.children:
             if norm_remote_path(file_.path) == target_file_path:
                 return file_
-        async for folder_ in store.folders:
-            if norm_remote_path(folder_.path) == target_file_path:
-                return folder_
         return None
-    else:
-        parent_target_file_path = '/'.join(file_path_segs[:-1])
-        parent_result = await find_by_path(store, parent_target_file_path)
-        if parent_result is None:
-            return None
-        else:
-            if is_folder(parent_result):
-                async for file_ in parent_result.files:
-                    if norm_remote_path(file_.path) == target_file_path:
-                        return file_
-                async for folder_ in parent_result.folders:
-                    if norm_remote_path(folder_.path) == target_file_path:
-                        return folder_
-            return None
+    parent_target_file_path = '/'.join(file_path_segs[:-1])
+    parent_result = await find_by_path(store, parent_target_file_path)
+    if parent_result is None:
+        return None
+    if not is_folder(parent_result):
+        return None
+    async for file_ in parent_result.children:
+        if norm_remote_path(file_.path) == target_file_path:
+            return file_
+    return None
 
 
 async def filter_by_path_pattern(store: ContainerMixin, target_file_path: str):
@@ -113,26 +105,29 @@ async def _filter_by_path_pattern(store: ContainerMixin, target_file_path: str, 
     if file_path_segs[-1] == '':
         file_path_segs = file_path_segs[:-1]
     if(len(file_path_segs) == 1):
-        async for file_ in store.files:
-            if _is_path_matched(target_file_path, file_.path):
-                yield file_
-        async for folder_ in store.folders:
-            if _is_path_matched(target_file_path, folder_.path):
-                yield folder_
-                if depth == 0:
-                    async for file_ in flatten(folder_):
-                        yield file_
-    else:
-        parent_target_file_path = '/' + '/'.join(file_path_segs[:-1]) + '/'
-        parent_result = _filter_by_path_pattern(store, parent_target_file_path, depth + 1)
-        for rf_ in parent_result:
-            if is_folder(rf_):
-                async for file_ in rf_.files:
-                    if _is_path_matched(target_file_path, file_.path):
-                        yield file_
-                async for folder_ in rf_.folders:
-                    if _is_path_matched(target_file_path, folder_.path):
-                        yield folder_
-                        if depth == 0:
-                            async for file_ in flatten(folder_):
-                                yield file_
+        async for file_ in store.children:
+            if not _is_path_matched(target_file_path, file_.path):
+                continue
+            yield file_
+            if not is_folder(file_):
+                continue
+            if depth > 0:
+                continue
+            async for child_ in flatten(file_):
+                yield child_
+        return
+    parent_target_file_path = '/' + '/'.join(file_path_segs[:-1]) + '/'
+    parent_result = _filter_by_path_pattern(store, parent_target_file_path, depth + 1)
+    for rf_ in parent_result:
+        if not is_folder(rf_):
+            continue
+        async for file_ in rf_.children:
+            if not _is_path_matched(target_file_path, file_.path):
+                continue
+            yield file_
+            if not is_folder(file_):
+                continue
+            if depth > 0:
+                continue
+            async for child_ in flatten(file_):
+                yield child_
