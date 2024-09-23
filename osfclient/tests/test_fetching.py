@@ -8,20 +8,11 @@ from mock import call, patch, mock_open
 from osfclient import OSF
 from osfclient.cli import fetch
 from osfclient.models import Storage
-from osfclient.models.utils import flatten
+from osfclient.models.utils import find_by_path
 
 from osfclient.tests.mocks import (
     MockProject, MockArgs, is_folder_mock, mock_async_open, MockStream,
 )
-
-
-async def _get_store_files(store):
-    files = []
-    async for file in flatten(store):
-        if(is_folder_mock(file)):
-            continue
-        files.append(file)
-    return files
 
 
 @pytest.mark.asyncio
@@ -73,11 +64,17 @@ async def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
     store = await project._storage_mock.return_value
     assert store._name_mock.return_value == 'osfstorage'
 
-    expected = [call._path_mock(), call.write_to(mock_stream)]
-    files = await _get_store_files(store)
-    assert expected == files[0].mock_calls
+    expected = [
+        call._path_mock(),
+        call.write_to(mock_stream),
+        call._path_mock(),
+    ]
+    file = await find_by_path(store, 'a/a/a')
+    print(file.mock_calls)
+    assert expected == file.mock_calls
     # second file should not have been looked at
-    assert not files[1].mock_calls
+    file = await find_by_path(store, 'b/b/b')
+    assert [call._path_mock()] == file.mock_calls
 
     # should create a file in the same directory when no local
     # filename is specified
