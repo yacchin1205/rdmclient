@@ -225,7 +225,6 @@ class ContainerMixin:
         return self._iter_children_for_mixed_types(self._files_url,
                                                    {'file': File, 'folder': Folder})
 
-
     async def create_folder(self, name, exist_ok=False):
         url = self._new_folder_url
         # Create a new sub-folder

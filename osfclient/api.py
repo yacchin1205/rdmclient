@@ -14,7 +14,7 @@ class OSF(OSFCore):
         super(OSF, self).__init__({})
         if base_url is not None:
             self.session.set_endpoint(base_url)
-        elif token is not None:
+        if token is not None:
             self.login_by_token(token)
 
     async def aclose(self):
