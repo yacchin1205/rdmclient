@@ -88,25 +88,25 @@ class File(OSFCore):
         Pass in a filepointer `fp` that has been opened for writing in
         binary mode.
         """
-        if 'b' not in fp.mode:
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
         try:
-            client = self._get_stream(self._download_url)
-            async with client as response:
-                if response.status_code == 401:
-                    raise UnauthorizedException("Unauthorized access to file")
-                await copyfileobj(response.aiter_bytes(DOWNLOAD_CHUNK_SIZE), fp,
-                            int(response.headers['Content-Length'])
-                            if 'Content-Length' in response.headers else None)
+            await self._write_to(fp, self._download_url)
         except UnauthorizedException:
-            async with self._get_stream(self._upload_url) as response:
-                await copyfileobj(response.aiter_bytes(DOWNLOAD_CHUNK_SIZE), fp,
-                            int(response.headers['Content-Length'])
-                            if 'Content-Length' in response.headers else None)
-        if response.status_code != 200:
-            raise RuntimeError("Response has status "
-                               "code {}.".format(response.status_code))
+            await self._write_to(fp, self._upload_url)
+
+    async def _write_to(self, fp, url):
+        async with self._stream('GET', url) as response:
+            if response.status_code == 401:
+                raise UnauthorizedException()
+            if response.status_code == 200:
+                async for data in response.aiter_bytes():
+                    await fp.write(data)
+                await fp.flush()
+            else:
+                raise RuntimeError("Response has status "
+                                "code {}.".format(response.status_code))
 
     async def remove(self):
         """Remove this file from the remote storage."""
@@ -120,7 +120,7 @@ class File(OSFCore):
         Pass in a filepointer `fp` that has been opened for writing in
         binary mode.
         """
-        if 'b' not in fp.mode:
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
         url = self._upload_url

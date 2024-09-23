@@ -4,10 +4,12 @@ from typing import Dict
 from ..exceptions import UnauthorizedException
 
 
+DEFAULT_TIMEOUT = httpx.Timeout(30.0, read=None)
+
 class OSFSession(httpx.AsyncClient):
-    def __init__(self):
+    def __init__(self, timeout=DEFAULT_TIMEOUT):
         """Handle HTTP session related work."""
-        super(OSFSession, self).__init__()
+        super(OSFSession, self).__init__(timeout=timeout)
         self.headers.update({
             # Only accept JSON responses
             'Accept': 'application/vnd.api+json',
@@ -41,16 +43,16 @@ class OSFSession(httpx.AsyncClient):
             raise UnauthorizedException()
         return response
 
-    async def get(self, url: str, *args, **kwargs):
+    def stream(self, method, url, *args, **kwargs):
+        kwargs_ = self.modify_kwargs(kwargs)
+        return super(OSFSession, self).stream(method, url, *args, **kwargs_)
+
+    async def get(self, url, *args, **kwargs):
         kwargs_ = self.modify_kwargs(kwargs)
         response = await super(OSFSession, self).get(url, *args, **kwargs_)
         if response.status_code == 401:
             raise UnauthorizedException()
         return response
-
-    def get_stream(self, url: str, *args, **kwargs):
-        kwargs_ = self.modify_kwargs(kwargs)
-        return super(OSFSession, self).stream('GET', url, *args, **kwargs_)
 
     def modify_kwargs(self, kwargs: Dict) -> Dict:
         if 'follow_redirects' in kwargs:

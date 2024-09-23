@@ -71,8 +71,8 @@ class Storage(OSFCore, ContainerMixin):
         To force overwrite of an existing file, set `force=True`.
         To overwrite an existing file only if the files differ, set `update=True`
         """
-        if 'b' not in fp.mode:
-           raise ValueError("File has to be opened in binary mode.")
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
+            raise ValueError("File has to be opened in binary mode.")
 
         # all paths are assumed to be absolute
         path = norm_remote_path(path)
