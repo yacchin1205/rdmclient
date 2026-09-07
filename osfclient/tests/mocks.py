@@ -58,7 +58,7 @@ def MockStorage(name):
         MockFolder('/a',folders=a_folders),
         MockFolder('/b',folders=b_folders),
         MockFolder('/c',folders=c_folders)]
-    mock = MagicMock(name='Storage-%s' % name,
+    mock = MagicMock(name='Storage-%s' % name, provider=name,
                      folders=AsyncIterator(folders),
                      children=AsyncIterator(folders))
     mock.create_file = MagicMock(return_value=FutureWrapper())
@@ -99,10 +99,11 @@ def MockStream(path, mode, size=1024):
 
 
 def MockProject(name):
+    default_store = MockStorage('osfstorage')
     mock = MagicMock(name='Project-%s' % name,
-                     storages=AsyncIterator([MockStorage('osfstorage'), MockStorage('gh')]))
+                     storages=AsyncIterator([default_store, MockStorage('gh')]))
     storage = MagicMock(name='Project-%s-storage' % name,
-                        return_value=FutureMockStorage('osfstorage'))
+                        return_value=FutureWrapper(default_store))
     type(mock).storage = storage
     mock._storage_mock = storage
 

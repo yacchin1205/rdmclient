@@ -53,9 +53,6 @@ async def test_select_project(OSF_project):
 
     # the mock project created by calling OSF().project()
     fake_project = OSF_project.return_value
-    expected = [call('osfstorage')]
-    assert fake_project._storage_mock.mock_calls == expected
-    # assert fake_project.mock_calls == expected
 
     expected = [call.create_file('bar/bar/foo.txt', fake_stream,
                                  force=False, update=False)]

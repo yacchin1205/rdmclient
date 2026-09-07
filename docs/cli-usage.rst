@@ -42,6 +42,13 @@ Below some examples on how to use the command-line program:
 
 If you're using python 3+, you can also use the aliases `ls` in place of `list`, and `rm` in place of `remove`.
 
+Remote paths can start with a provider identifier, such as
+``s3compatsigv4/folder/file.txt``. Providers are discovered from the project's
+storage API. If the first path component does not match a connected provider,
+the path refers to the default ``osfstorage``.
+To access a folder whose name matches a connected provider, explicitly prefix
+the path with ``osfstorage/``.
+
 
 If the project is private you will need to provide authentication
 details. You can set the ``OSF_TOKEN`` environment
