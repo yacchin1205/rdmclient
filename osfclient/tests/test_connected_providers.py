@@ -6,7 +6,8 @@ from mock import patch
 from osfclient import OSF
 from osfclient.cli import fetch, upload, makefolder, remove, move
 from osfclient.tests.mocks import (
-    AsyncIterator, MockArgs, MockProject, MockStorage, MockStream,
+    AsyncIterator, MockAddon, MockAddons, MockArgs, MockProject, MockStorage,
+    MockStream,
     is_folder_mock, mock_async_open,
 )
 from osfclient.utils import find_by_path
@@ -116,3 +117,35 @@ async def test_move_between_connected_providers(target_path, folder_path,
     file_ = await find_by_path(source, 'a/a/a')
     file_.move_to.assert_called_once_with(
         'future-target', folder, to_filename=filename, force=False)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('command, path_args', [
+    (upload, {'source': 'local.txt', 'destination': None}),
+    (fetch, {'remote': None}),
+    (makefolder, {'target': None}),
+    (remove, {'target': None}),
+    (move, {'source': None, 'target': 'osfstorage/c/'}),
+])
+@patch.object(OSF, 'addons', new=MockAddons([
+    MockAddon('binderhub', categories=['other']), MockAddon('s3compatsigv4')]))
+async def test_unconnected_provider_is_rejected(command, path_args,
+                                                monkeypatch):
+    monkeypatch.setenv('OSF_TOKEN', 'secret')
+    project = MockProject('1234')
+    default_store = MockStorage('osfstorage')
+    project.storages = AsyncIterator([default_store])
+    path_args = {key: 's3compatsigv4/folder/file.txt' if value is None else value
+                 for key, value in path_args.items()}
+    args = MockArgs(project='1234', **path_args)
+
+    with patch.object(OSF, 'project', return_value=project):
+        with pytest.raises(RuntimeError, match=(
+                "Storage provider 's3compatsigv4' is not connected to "
+                "project '1234'")):
+            await command(args)
+
+    default_store.create_file.assert_not_called()
+    default_store.create_folder.assert_not_called()
+    file_ = await find_by_path(default_store, 'folder/file.txt')
+    assert file_ is None

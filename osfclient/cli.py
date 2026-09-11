@@ -184,8 +184,9 @@ async def fetch(args):
     """Fetch an individual file from a project.
 
     The first part of the remote path is interpreted as the name of the
-    connected storage provider. If there is no match, the default
-    (osfstorage) is used.
+    connected storage provider. A provider that exists on the server but
+    is not connected to the project is an error. If there is no match,
+    the default (osfstorage) is used.
 
     The local path defaults to the name of the remote file.
 
@@ -197,7 +198,7 @@ async def fetch(args):
     """
     osf = _setup_osf(args)
     project = await osf.project(args.project)
-    store, remote_path = await split_storage(args.remote, project)
+    store, remote_path = await split_storage(args.remote, osf, project)
 
     local_path = args.local
     if local_path is None:
@@ -277,8 +278,9 @@ async def upload(args):
     """Upload a new file to an existing project.
 
     The first part of the remote path is interpreted as the name of the
-    connected storage provider. If there is no match, the default
-    (osfstorage) is used.
+    connected storage provider. A provider that exists on the server but
+    is not connected to the project is an error. If there is no match,
+    the default (osfstorage) is used.
 
     If the project is private you need to specify a username or token.
 
@@ -298,7 +300,7 @@ async def upload(args):
         sys.exit('To upload a file you need to provide a token.')
 
     project = await osf.project(args.project)
-    store, remote_path = await split_storage(args.destination, project)
+    store, remote_path = await split_storage(args.destination, osf, project)
 
     if args.recursive:
         if not os.path.isdir(args.source):
@@ -330,8 +332,9 @@ async def makefolder(args):
     """Create a new folder in an existing project.
 
     The first part of the remote path is interpreted as the name of the
-    connected storage provider. If there is no match, the default
-    (osfstorage) is used.
+    connected storage provider. A provider that exists on the server but
+    is not connected to the project is an error. If there is no match,
+    the default (osfstorage) is used.
     """
     osf = _setup_osf(args)
     if not osf.has_auth:
@@ -339,7 +342,7 @@ async def makefolder(args):
 
     project = await osf.project(args.project)
 
-    store, remote_path = await split_storage(args.target, project)
+    store, remote_path = await split_storage(args.target, osf, project)
 
     f = await find_ancestral_folder(store, remote_path)
     if f is None:
@@ -358,8 +361,9 @@ async def remove(args):
     """Remove a file from the project's storage.
 
     The first part of the remote path is interpreted as the name of the
-    connected storage provider. If there is no match, the default
-    (osfstorage) is used.
+    connected storage provider. A provider that exists on the server but
+    is not connected to the project is an error. If there is no match,
+    the default (osfstorage) is used.
     """
     osf = _setup_osf(args)
     if not osf.has_auth:
@@ -367,7 +371,7 @@ async def remove(args):
 
     project = await osf.project(args.project)
 
-    store, remote_path = await split_storage(args.target, project)
+    store, remote_path = await split_storage(args.target, osf, project)
 
     f = await find_by_path(store, remote_path)
     if f is None:
@@ -380,8 +384,9 @@ async def move(args):
     """Move a file to specified location on the project's storage.
 
     The first part of the paths is interpreted as the name of the
-    connected storage provider. If there is no match, the default
-    (osfstorage) is used.
+    connected storage provider. A provider that exists on the server but
+    is not connected to the project is an error. If there is no match,
+    the default (osfstorage) is used.
     """
     osf = _setup_osf(args)
     if not osf.has_auth:
@@ -390,7 +395,7 @@ async def move(args):
     project = await osf.project(args.project)
 
     target_store, target_path = await split_storage(
-        args.target, project, normalize=False)
+        args.target, osf, project, normalize=False)
     target_storage = target_store.provider
 
     if target_path.endswith('/'):
@@ -412,7 +417,7 @@ async def move(args):
         target_folder = await _ensure_folder(target_store, target_folder_path)
 
     # Move a file
-    store, remote_path = await split_storage(args.source, project)
+    store, remote_path = await split_storage(args.source, osf, project)
 
     f = await find_by_path(store, remote_path)
     if f is None:

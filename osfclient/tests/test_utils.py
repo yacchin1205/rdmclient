@@ -7,7 +7,7 @@ from osfclient.utils import file_empty
 from osfclient.utils import norm_remote_path
 from osfclient.utils import makedirs
 from osfclient.utils import split_storage
-from osfclient.tests.mocks import AsyncIterator, MockStream
+from osfclient.tests.mocks import AsyncIterator, MockAddon, MockStream
 
 
 @pytest.mark.asyncio
@@ -27,23 +27,63 @@ from osfclient.tests.mocks import AsyncIterator, MockStream
     ('osfstorage/custom/file.txt', True, 'osfstorage', 'custom/file.txt'),
     ('github/file.txt', True, 'osfstorage', 'github/file.txt'),
     ('custom-other/file.txt', True, 'osfstorage', 'custom-other/file.txt'),
+    ('unconnected', True, 'osfstorage', 'unconnected'),
+    ('osfstorage/unconnected/file.txt', True, 'osfstorage',
+     'unconnected/file.txt'),
+    ('binderhub/notebook.ipynb', True, 'osfstorage', 'binderhub/notebook.ipynb'),
 ])
 async def test_split_storage(remote, normalize, provider, path, monkeypatch):
     # Obsolete environment overrides must not hide connected providers.
     monkeypatch.setenv('KNOWN_PROVIDERS', 'github')
     stores = [SimpleNamespace(provider=name, name='Display name')
               for name in ['osfstorage', 'custom']]
-    project = SimpleNamespace(storages=AsyncIterator(stores))
-    store, actual_path = await split_storage(remote, project, normalize=normalize)
+    project = SimpleNamespace(id='1234', storages=AsyncIterator(stores))
+    osf = SimpleNamespace(addons=AsyncIterator([
+        MockAddon('custom'), MockAddon('unconnected'),
+        MockAddon('binderhub', categories=['other'])]))
+    store, actual_path = await split_storage(remote, osf, project,
+                                             normalize=normalize)
     assert store is stores[['osfstorage', 'custom'].index(provider)]
     assert actual_path == path
 
 
 @pytest.mark.asyncio
+async def test_split_storage_connected_provider_skips_addons():
+    stores = [SimpleNamespace(provider=name) for name in ['osfstorage', 'custom']]
+    project = SimpleNamespace(id='1234', storages=AsyncIterator(stores))
+    osf = SimpleNamespace(addons=AsyncIterator([MockAddon('custom')]))
+
+    store, path = await split_storage('custom/file.txt', osf, project)
+
+    assert store is stores[1]
+    assert path == 'file.txt'
+    assert not osf.addons.__aiter__.called
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('remote, normalize', [
+    ('unconnected/file.txt', True),
+    ('/unconnected/file.txt', True),
+    ('unconnected/', True),
+    ('/unconnected/', False),
+])
+async def test_split_storage_unconnected_provider(remote, normalize):
+    stores = [SimpleNamespace(provider='osfstorage')]
+    project = SimpleNamespace(id='1234', storages=AsyncIterator(stores))
+    osf = SimpleNamespace(addons=AsyncIterator([
+        MockAddon('custom'), MockAddon('unconnected', categories=['citations'])]))
+
+    with pytest.raises(RuntimeError, match=(
+            "Storage provider 'unconnected' is not connected to project '1234'")):
+        await split_storage(remote, osf, project, normalize=normalize)
+
+
+@pytest.mark.asyncio
 async def test_split_storage_missing_default():
-    project = SimpleNamespace(storages=AsyncIterator([]))
+    project = SimpleNamespace(id='1234', storages=AsyncIterator([]))
+    osf = SimpleNamespace(addons=AsyncIterator([]))
     with pytest.raises(RuntimeError, match="no storage provider 'osfstorage'"):
-        await split_storage('folder/file.txt', project)
+        await split_storage('folder/file.txt', osf, project)
 
 
 def test_norm_remote_path():

@@ -10,6 +10,7 @@ import pytest
 from osfclient import OSF
 from osfclient.cli import upload
 
+from osfclient.tests.mocks import MockAddon, MockAddons
 from osfclient.tests.mocks import MockArgs
 from osfclient.tests.mocks import MockProject
 from osfclient.tests.mocks import mock_async_open, MockStream
@@ -31,6 +32,7 @@ async def test_anonymous_doesnt_work():
 
 
 @pytest.mark.asyncio
+@patch.object(OSF, 'addons', new=MockAddons([MockAddon('github')]))
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_select_project(OSF_project):
     args = MockArgs(project='1234',
@@ -63,6 +65,7 @@ async def test_select_project(OSF_project):
 
 
 @pytest.mark.asyncio
+@patch.object(OSF, 'addons', new=MockAddons([MockAddon('github')]))
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_recursive_requires_directory(OSF_project):
     # test that we check if source is a directory when using recursive mode
@@ -86,6 +89,7 @@ async def test_recursive_requires_directory(OSF_project):
 
 
 @pytest.mark.asyncio
+@patch.object(OSF, 'addons', new=MockAddons([MockAddon('github')]))
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_recursive_upload(OSF_project):
     # test that we check if source is a directory when using recursive mode
@@ -132,6 +136,7 @@ async def test_recursive_upload(OSF_project):
 
 
 @pytest.mark.asyncio
+@patch.object(OSF, 'addons', new=MockAddons([MockAddon('github')]))
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_recursive_upload_with_subdir(OSF_project):
     # test that an extra level of subdirectory is created on the remote side

@@ -21,27 +21,39 @@ def norm_remote_path(path: str) -> str:
         return path
 
 
-async def split_storage(path, project, default='osfstorage', normalize=True):
+async def split_storage(path, osf, project, default='osfstorage',
+                        normalize=True):
     """Resolve a remote path against the project's connected storages.
 
     A connected provider at the start of the path selects that storage.
-    Otherwise the entire path belongs to the default storage. Explicitly
-    prefix with ``osfstorage/`` to access a folder named after a provider.
+    A provider the server offers but the project has not connected is an
+    error rather than a folder in the default storage. Addons in the
+    ``other`` category never hold files, so their names stay usable as
+    folder names. Otherwise the entire path belongs to the default storage.
+    Explicitly prefix with ``osfstorage/`` to access a folder named after
+    a provider.
     """
     is_directory = path.endswith('/')
     if normalize:
         path = norm_remote_path(path)
     path = path.lstrip('/')
     provider, separator, remote_path = path.partition('/')
+    has_provider = bool(separator) or is_directory
     default_store = None
     async for store in project.storages:
-        if store.provider == provider and (separator or is_directory):
+        if has_provider and store.provider == provider:
             return store, remote_path
         if store.provider == default:
             default_store = store
 
     if default_store is None:
         raise RuntimeError("Project has no storage provider '{}'".format(default))
+    if has_provider:
+        async for addon in osf.addons:
+            if addon.id == provider and 'other' not in addon.categories:
+                raise RuntimeError(
+                    "Storage provider '{}' is not connected to project '{}'"
+                    .format(provider, project.id))
     return default_store, path
 
 

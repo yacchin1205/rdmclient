@@ -1,6 +1,7 @@
 from mock import patch
 import pytest
 
+from osfclient import OSF
 from osfclient.models import OSFCore
 from osfclient.models import Project
 from osfclient.models import Storage
@@ -108,7 +109,7 @@ async def test_resolve_storage_on_later_page(OSFCore_get):
     second['data'][0]['attributes']['name'] = 'A display name'
     OSFCore_get.side_effect = [FakeResponse(200, first), FakeResponse(200, second)]
 
-    store, path = await split_storage('/new-provider/folder/file.txt', project)
+    store, path = await split_storage('/new-provider/folder/file.txt', OSF(), project)
 
     assert store.provider == 'new-provider'
     assert store.name == 'A display name'
@@ -128,7 +129,7 @@ async def test_resolve_storage_propagates_api_error(OSFCore_get):
     OSFCore_get.side_effect = [FakeResponse(200, first), FakeResponse(403, {})]
 
     with pytest.raises(RuntimeError, match='403'):
-        await split_storage('new-provider/file.txt', project)
+        await split_storage('new-provider/file.txt', OSF(), project)
 
 
 @pytest.mark.asyncio
@@ -146,4 +147,4 @@ async def test_resolve_storage_rejects_missing_pagination(OSFCore_get,
     OSFCore_get.return_value = FakeResponse(200, response)
 
     with pytest.raises(KeyError, match=missing_field):
-        await split_storage('folder/file.txt', project)
+        await split_storage('folder/file.txt', OSF(), project)

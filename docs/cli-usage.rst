@@ -44,10 +44,13 @@ If you're using python 3+, you can also use the aliases `ls` in place of `list`,
 
 Remote paths can start with a provider identifier, such as
 ``s3compatsigv4/folder/file.txt``. Providers are discovered from the project's
-storage API. If the first path component does not match a connected provider,
-the path refers to the default ``osfstorage``.
-To access a folder whose name matches a connected provider, explicitly prefix
-the path with ``osfstorage/``.
+storage API. If the first path component names a provider the server offers
+but the project has not connected, the command fails instead of writing into
+``osfstorage``. Addons in the ``other`` category, such as ``binderhub``, do
+not hold files and are not treated as providers. If it matches no provider
+at all, the path refers to the default ``osfstorage``.
+To access a folder whose name matches a provider, explicitly prefix the path
+with ``osfstorage/``.
 
 
 If the project is private you will need to provide authentication
